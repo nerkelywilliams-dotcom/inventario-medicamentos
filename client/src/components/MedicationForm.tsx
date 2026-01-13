@@ -45,10 +45,24 @@ export function MedicationForm({ defaultValues, onSubmit, isLoading, submitLabel
         : undefined,
     },
   });
+const handleSubmit = (data: any) => {
+    const file = data.imageUrl;
+    
+    if (file instanceof File) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        // Esto envía la foto convertida a texto a la función original que guarda
+        props.onSubmit({ ...data, imageUrl: reader.result as string });
+      };
+      reader.readAsDataURL(file);
+    } else {
+      props.onSubmit(data);
+    }
+  };
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+      <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <FormField
             control={form.control}
@@ -154,21 +168,28 @@ export function MedicationForm({ defaultValues, onSubmit, isLoading, submitLabel
                 </FormItem>
               )}
             />
-             <FormField
-              control={form.control}
-              name="imageUrl"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>URL Imagen (Opcional)</FormLabel>
-                  <FormControl>
-                    <Input placeholder="https://..." {...field} value={field.value || ''} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          </div>
-
+ <FormField
+  control={form.control}
+  name="imageUrl"
+  render={({ field: { value, onChange, ...field } }: { field: any }) => (
+    <FormItem>
+      <FormLabel>Foto del Medicamento</FormLabel>
+      <FormControl>
+        <Input 
+          type="file" 
+          accept="image/*" 
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) {
+              onChange(file); 
+            }
+          }} 
+        />
+      </FormControl>
+      <FormMessage />
+    </FormItem>
+  )}
+/>
           <FormField
             control={form.control}
             name="mechanismOfAction"
