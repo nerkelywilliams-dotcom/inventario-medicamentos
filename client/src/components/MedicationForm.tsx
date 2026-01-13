@@ -48,14 +48,17 @@ export function MedicationForm({ defaultValues, onSubmit, isLoading, submitLabel
 const handleSubmit = (data: any) => {
     const file = data.imageUrl;
     
+    // Si es un archivo, lo convertimos a texto antes de enviar
     if (file instanceof File) {
       const reader = new FileReader();
       reader.onloadend = () => {
-        // Esto envía la foto convertida a texto a la función original que guarda
-        props.onSubmit({ ...data, imageUrl: reader.result as string });
+        // IMPORTANTE: Enviamos los datos AQUÍ ADENTRO con la imagen convertida
+        const finalData = { ...data, imageUrl: reader.result as string };
+        props.onSubmit(finalData);
       };
       reader.readAsDataURL(file);
     } else {
+      // Si no hay archivo nuevo, enviamos los datos tal cual
       props.onSubmit(data);
     }
   };
