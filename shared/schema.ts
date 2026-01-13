@@ -1,28 +1,28 @@
-import { pgTable, text, serial, integer, timestamp } from "drizzle-orm/pg-core";
+import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { relations } from "drizzle-orm";
 
-export const families = pgTable("families", {
-  id: serial("id").primaryKey(),
+export const families = sqliteTable("families", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
   name: text("name").notNull(),
   description: text("description"),
 });
 
-export const medications = pgTable("medications", {
-  id: serial("id").primaryKey(),
+export const medications = sqliteTable("medications", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
   familyId: integer("family_id").references(() => families.id),
   name: text("name").notNull(),
   description: text("description"), 
   presentation: text("presentation").notNull(),
   quantity: integer("quantity").notNull().default(0),
-  expirationDate: timestamp("expiration_date").notNull(),
+  expirationDate: text("expiration_date").notNull(),
   imageUrl: text("image_url"),
   mechanismOfAction: text("mechanism_of_action"),
   indications: text("indications"),
   posology: text("posology"),
   administrationRoute: text("administration_route"),
-  createdAt: timestamp("created_at").defaultNow(),
+  createdAt: text("created_at").default("CURRENT_TIMESTAMP"),
 });
 
 export const familiesRelations = relations(families, ({ many }) => ({
@@ -43,8 +43,8 @@ export type Family = typeof families.$inferSelect;
 export type InsertFamily = z.infer<typeof insertFamilySchema>;
 export type Medication = typeof medications.$inferSelect;
 export type InsertMedication = z.infer<typeof insertMedicationSchema>;
-export const users = pgTable("users", {
-  id: serial("id").primaryKey(),
+export const users = sqliteTable("users", {
+ id: integer("id").primaryKey({ autoIncrement: true }),
   username: text("username").notNull().unique(),
   password: text("password").notNull(),
   role: text("role").notNull().default("viewer"), // "admin" o "viewer"
