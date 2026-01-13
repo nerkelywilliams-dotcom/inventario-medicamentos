@@ -61,7 +61,16 @@ export function MedicationDetail({ medication, trigger, open, onOpenChange }: Me
                 </div>
               </div>
             </div>
-
+{/* Imagen del Producto */}
+{medication.imageUrl && (
+  <div className="relative aspect-video w-full overflow-hidden rounded-xl border bg-muted/50 mb-6">
+    <img 
+      src={medication.imageUrl} 
+      alt={medication.name}
+      className="h-full w-full object-contain p-4"
+    />
+  </div>
+)}
             {/* Technical Details Grid */}
             <div className="grid md:grid-cols-2 gap-8">
               <section className="space-y-3">

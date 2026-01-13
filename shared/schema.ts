@@ -43,3 +43,14 @@ export type Family = typeof families.$inferSelect;
 export type InsertFamily = z.infer<typeof insertFamilySchema>;
 export type Medication = typeof medications.$inferSelect;
 export type InsertMedication = z.infer<typeof insertMedicationSchema>;
+export const users = pgTable("users", {
+  id: serial("id").primaryKey(),
+  username: text("username").notNull().unique(),
+  password: text("password").notNull(),
+  role: text("role").notNull().default("viewer"), // "admin" o "viewer"
+});
+
+// Esto es para que el sistema pueda usar esta tabla en otras partes
+export const insertUserSchema = createInsertSchema(users).omit({ id: true });
+export type User = typeof users.$inferSelect;
+export type InsertUser = z.infer<typeof insertUserSchema>;

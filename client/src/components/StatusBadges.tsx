@@ -20,9 +20,9 @@ export function ExpiryBadge({ date }: ExpiryBadgeProps) {
     status = 'expired';
     label = 'Vencido';
     Icon = AlertCircle;
-  } else if (daysUntilExpiry < 30) {
+  } else if (daysUntilExpiry < 60) {
     status = 'warning';
-    label = `Vence en ${daysUntilExpiry} días`;
+    label = `¡Atención! Solo quedan ${daysUntilExpiry} días`;
     Icon = Clock;
   }
 

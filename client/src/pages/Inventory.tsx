@@ -65,7 +65,7 @@ export default function Inventory() {
     <div className="space-y-6 animate-fade-in">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-3xl font-display font-bold text-foreground">Inventario</h2>
+          <h2 className="text-3xl font-display font-bold text-foreground">Gestión de Farmacia</h2>
           <p className="text-muted-foreground">Gestión de stock y fichas técnicas.</p>
         </div>
         <div className="flex gap-2">
