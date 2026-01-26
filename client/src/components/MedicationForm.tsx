@@ -22,6 +22,11 @@ const formSchema = insertMedicationSchema.extend({
   quantity: z.coerce.number().min(0, "La cantidad no puede ser negativa"),
   familyId: z.coerce.number().optional(),
   expirationDate: z.coerce.date(),
+  imageUrl: z.union([
+    z.instanceof(File),
+    z.string(),
+    z.null(),
+  ]).optional(),
 });
 
 export function MedicationForm({ defaultValues, onSubmit, isLoading, submitLabel }: MedicationFormProps) {
@@ -45,7 +50,8 @@ export function MedicationForm({ defaultValues, onSubmit, isLoading, submitLabel
         : undefined,
     },
   });
-const handleSubmit = (data: any) => {
+
+  const handleSubmit = (data: any) => {
     const file = data.imageUrl;
     
     // Si es un archivo, lo convertimos a texto antes de enviar
@@ -54,12 +60,12 @@ const handleSubmit = (data: any) => {
       reader.onloadend = () => {
         // IMPORTANTE: Enviamos los datos AQUÍ ADENTRO con la imagen convertida
         const finalData = { ...data, imageUrl: reader.result as string };
-        props.onSubmit(finalData);
+        onSubmit(finalData);
       };
       reader.readAsDataURL(file);
     } else {
       // Si no hay archivo nuevo, enviamos los datos tal cual
-      props.onSubmit(data);
+      onSubmit(data);
     }
   };
 
@@ -158,7 +164,7 @@ const handleSubmit = (data: any) => {
           <h3 className="font-semibold text-lg text-foreground/80">Ficha Técnica</h3>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-             <FormField
+            <FormField
               control={form.control}
               name="administrationRoute"
               render={({ field }) => (
@@ -171,28 +177,31 @@ const handleSubmit = (data: any) => {
                 </FormItem>
               )}
             />
- <FormField
-  control={form.control}
-  name="imageUrl"
-  render={({ field: { value, onChange, ...field } }: { field: any }) => (
-    <FormItem>
-      <FormLabel>Foto del Medicamento</FormLabel>
-      <FormControl>
-        <Input 
-          type="file" 
-          accept="image/*" 
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (file) {
-              onChange(file); 
-            }
-          }} 
-        />
-      </FormControl>
-      <FormMessage />
-    </FormItem>
-  )}
-/>
+
+            <FormField
+              control={form.control}
+              name="imageUrl"
+              render={({ field: { value, onChange, ...field } }: { field: any }) => (
+                <FormItem>
+                  <FormLabel>Foto del Medicamento</FormLabel>
+                  <FormControl>
+                    <Input 
+                      type="file" 
+                      accept="image/*" 
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          onChange(file); 
+                        }
+                      }} 
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+
           <FormField
             control={form.control}
             name="mechanismOfAction"
@@ -236,6 +245,20 @@ const handleSubmit = (data: any) => {
               )}
             />
           </div>
+
+          <FormField
+            control={form.control}
+            name="description"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Descripción General</FormLabel>
+                <FormControl>
+                  <Textarea placeholder="Descripción del medicamento..." className="resize-none" {...field} value={field.value || ''} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
         </div>
 
         <div className="flex justify-end pt-4">

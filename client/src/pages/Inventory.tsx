@@ -2,6 +2,7 @@ import { useState } from "react";
 import * as XLSX from "xlsx";
 import { useMedications, useCreateMedication, useUpdateMedication, useDeleteMedication } from "@/hooks/use-medications";
 import { useFamilies } from "@/hooks/use-families";
+import { useAuth } from "@/context/AuthContext";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -18,10 +19,12 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 
 export default function Inventory() {
+  const { isAdmin } = useAuth();
   const [search, setSearch] = useState("");
   const [familyFilter, setFamilyFilter] = useState<string>("all");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [detailId, setDetailId] = useState<number | null>(null);
   
   const { data: medications, isLoading } = useMedications({ 
     search: search || undefined,
@@ -72,12 +75,13 @@ export default function Inventory() {
           <Button variant="outline" onClick={handleExport} className="gap-2">
             <FileDown className="h-4 w-4" /> Exportar
           </Button>
-          <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-            <DialogTrigger asChild>
-              <Button className="gap-2 shadow-lg shadow-primary/20">
-                <Plus className="h-4 w-4" /> Nuevo Medicamento
-              </Button>
-            </DialogTrigger>
+          {isAdmin && (
+            <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+              <DialogTrigger asChild>
+                <Button className="gap-2 shadow-lg shadow-primary/20">
+                  <Plus className="h-4 w-4" /> Nuevo Medicamento
+                </Button>
+              </DialogTrigger>
             <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Registrar Nuevo Medicamento</DialogTitle>
@@ -92,7 +96,8 @@ export default function Inventory() {
                 }}
               />
             </DialogContent>
-          </Dialog>
+            </Dialog>
+          )}
         </div>
       </div>
 
@@ -184,46 +189,48 @@ export default function Inventory() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <Dialog>
+                        <Dialog open={detailId === med.id} onOpenChange={(open) => setDetailId(open ? med.id : null)}>
                           <DialogTrigger asChild>
                             <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="cursor-pointer">
                               <Eye className="mr-2 h-4 w-4" /> Ver Ficha
                             </DropdownMenuItem>
                           </DialogTrigger>
-                          <DialogContent className="max-w-3xl p-0">
-                             <MedicationDetail medication={med} />
-                          </DialogContent>
+                          <MedicationDetail medication={med} open={detailId === med.id} onOpenChange={(open) => setDetailId(open ? med.id : null)} />
                         </Dialog>
                         
-                        <Dialog open={editingId === med.id} onOpenChange={(open) => setEditingId(open ? med.id : null)}>
-                          <DialogTrigger asChild>
-                             <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="cursor-pointer">
-                              <Pencil className="mr-2 h-4 w-4" /> Editar
-                            </DropdownMenuItem>
-                          </DialogTrigger>
-                          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-                            <DialogHeader>
-                              <DialogTitle>Editar Medicamento</DialogTitle>
-                            </DialogHeader>
-                            <MedicationForm 
-                              defaultValues={med}
-                              submitLabel="Guardar Cambios"
-                              isLoading={updateMutation.isPending}
-                              onSubmit={async (data) => {
-                                await updateMutation.mutateAsync({ id: med.id, ...data });
-                                setEditingId(null);
-                                toast({ title: "Actualizado", description: "Cambios guardados correctamente." });
-                              }}
-                            />
-                          </DialogContent>
-                        </Dialog>
+                        {isAdmin && (
+                          <>
+                            <Dialog open={editingId === med.id} onOpenChange={(open) => setEditingId(open ? med.id : null)}>
+                              <DialogTrigger asChild>
+                                 <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="cursor-pointer">
+                                  <Pencil className="mr-2 h-4 w-4" /> Editar
+                                </DropdownMenuItem>
+                              </DialogTrigger>
+                              <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+                                <DialogHeader>
+                                  <DialogTitle>Editar Medicamento</DialogTitle>
+                                </DialogHeader>
+                                <MedicationForm 
+                                  defaultValues={med}
+                                  submitLabel="Guardar Cambios"
+                                  isLoading={updateMutation.isPending}
+                                  onSubmit={async (data) => {
+                                    await updateMutation.mutateAsync({ id: med.id, ...data });
+                                    setEditingId(null);
+                                    toast({ title: "Actualizado", description: "Cambios guardados correctamente." });
+                                  }}
+                                />
+                              </DialogContent>
+                            </Dialog>
 
-                        <DropdownMenuItem 
-                          className="text-red-600 focus:text-red-600 cursor-pointer"
-                          onClick={() => handleDelete(med.id)}
-                        >
-                          <Trash2 className="mr-2 h-4 w-4" /> Eliminar
-                        </DropdownMenuItem>
+                            <DropdownMenuItem 
+                              className="text-red-600 focus:text-red-600 cursor-pointer"
+                              onClick={() => handleDelete(med.id)}
+                            >
+                              <Trash2 className="mr-2 h-4 w-4" /> Eliminar
+                            </DropdownMenuItem>
+                          </>
+                        )}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>

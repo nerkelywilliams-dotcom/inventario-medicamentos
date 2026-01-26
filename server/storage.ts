@@ -1,8 +1,9 @@
 import { db } from "./db";
 import {
-  families, medications,
+  families, medications, users,
   type Family, type InsertFamily,
-  type Medication, type InsertMedication, type MedicationWithFamily
+  type Medication, type InsertMedication, type MedicationWithFamily,
+  type User, type InsertUser
 } from "@shared/schema";
 import { eq, ilike, and, desc } from "drizzle-orm";
 
@@ -18,6 +19,12 @@ export interface IStorage {
   createMedication(medication: InsertMedication): Promise<Medication>;
   updateMedication(id: number, medication: Partial<InsertMedication>): Promise<Medication | undefined>;
   deleteMedication(id: number): Promise<void>;
+
+  // Users
+  getUsers(): Promise<User[]>;
+  getUserByUsername(username: string): Promise<User | undefined>;
+  createUser(user: InsertUser): Promise<User>;
+  deleteUser(id: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -82,6 +89,24 @@ export class DatabaseStorage implements IStorage {
 
   async deleteMedication(id: number): Promise<void> {
     await db.delete(medications).where(eq(medications.id, id));
+  }
+
+  async getUsers(): Promise<User[]> {
+    return await db.select().from(users);
+  }
+
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.username, username));
+    return user;
+  }
+
+  async createUser(insertUser: InsertUser): Promise<User> {
+    const [user] = await db.insert(users).values(insertUser).returning();
+    return user;
+  }
+
+  async deleteUser(id: number): Promise<void> {
+    await db.delete(users).where(eq(users.id, id));
   }
 }
 

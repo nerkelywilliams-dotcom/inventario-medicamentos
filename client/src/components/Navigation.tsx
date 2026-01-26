@@ -1,14 +1,18 @@
 import { Link, useLocation } from "wouter";
-import { LayoutDashboard, Pill, FileText, Settings, Activity } from "lucide-react";
+import { LayoutDashboard, Pill, FileText, Settings, Activity, Users, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/context/AuthContext";
+import { Button } from "@/components/ui/button";
 
 export function Navigation() {
   const [location] = useLocation();
+  const { user, logout, isAdmin } = useAuth();
 
   const navItems = [
     { href: "/", label: "Panel Principal", icon: LayoutDashboard },
     { href: "/inventory", label: "Inventario", icon: Pill },
-    { href: "/families", label: "Familias", icon: Settings },
+    ...(isAdmin ? [{ href: "/families", label: "Familias", icon: Settings }] : []),
+    ...(isAdmin ? [{ href: "/users", label: "Usuarios", icon: Users }] : []),
   ];
 
   return (
@@ -42,14 +46,20 @@ export function Navigation() {
         })}
       </div>
 
-      <div className="mt-auto px-4 py-6 border-t border-border">
+      <div className="mt-auto px-4 py-6 border-t border-border space-y-4">
         <div className="bg-gradient-to-br from-primary/10 to-secondary/20 p-4 rounded-xl border border-primary/5">
-          <h3 className="font-semibold text-primary mb-1 text-sm">¿Necesitas ayuda?</h3>
-          <p className="text-xs text-muted-foreground mb-3">Contacta a soporte técnico para asistencia.</p>
-          <button className="text-xs font-medium text-primary hover:underline">
-            Contactar Soporte
-          </button>
+          <p className="text-xs text-muted-foreground mb-2">Conectado como:</p>
+          <p className="font-semibold text-sm text-foreground capitalize">{user?.username}</p>
+          <p className="text-xs text-primary font-medium">{isAdmin ? '👑 Administrador' : '👤 Visualizador'}</p>
         </div>
+        <Button 
+          variant="outline" 
+          size="sm" 
+          onClick={logout}
+          className="w-full gap-2 justify-center"
+        >
+          <LogOut className="h-4 w-4" /> Cerrar Sesión
+        </Button>
       </div>
     </nav>
   );
@@ -57,11 +67,13 @@ export function Navigation() {
 
 export function MobileNav() {
   const [location] = useLocation();
+  const { isAdmin } = useAuth();
   
   const navItems = [
     { href: "/", icon: LayoutDashboard },
     { href: "/inventory", icon: Pill },
-    { href: "/families", icon: Settings },
+    ...(isAdmin ? [{ href: "/families", icon: Settings }] : []),
+    ...(isAdmin ? [{ href: "/users", icon: Users }] : []),
   ];
 
   return (

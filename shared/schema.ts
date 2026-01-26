@@ -50,7 +50,15 @@ export const users = pgTable("users", {
   role: text("role").notNull().default("viewer"), // "admin" o "viewer"
 });
 
-// Esto es para que el sistema pueda usar esta tabla en otras partes
 export const insertUserSchema = createInsertSchema(users).omit({ id: true });
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
+
+// Schemas adicionales para autenticación
+export const loginSchema = z.object({
+  username: z.string().min(1, 'El usuario es requerido'),
+  password: z.string().min(1, 'La contraseña es requerida'),
+});
+
+export type LoginRequest = z.infer<typeof loginSchema>;
+export type LoginResponse = Omit<User, 'password'>;

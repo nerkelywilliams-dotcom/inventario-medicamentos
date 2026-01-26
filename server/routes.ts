@@ -3,12 +3,72 @@ import type { Server } from "http";
 import { storage } from "./storage";
 import { api } from "@shared/routes";
 import { z } from "zod";
-import { insertMedicationSchema, insertFamilySchema } from "@shared/schema";
+import { insertMedicationSchema, insertFamilySchema, loginSchema, insertUserSchema } from "@shared/schema";
 
 export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
+  // Auth
+  app.post('/api/auth/login', async (req, res) => {
+    try {
+      const { username, password } = loginSchema.parse(req.body);
+      const user = await storage.getUserByUsername(username);
+      
+      if (!user || user.password !== password) {
+        return res.status(401).json({ message: 'Usuario o contraseña incorrectos' });
+      }
+
+      // Return user without password
+      const { password: _, ...userWithoutPassword } = user;
+      res.json(userWithoutPassword);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({
+          message: err.errors[0].message,
+          field: err.errors[0].path.join('.'),
+        });
+      }
+      throw err;
+    }
+  });
+
+  // Users
+  app.get('/api/users', async (_req, res) => {
+    const users = await storage.getUsers();
+    // Don't return passwords
+    const safeUsers = users.map(({ password: _, ...user }) => user);
+    res.json(safeUsers);
+  });
+
+  app.post('/api/users', async (req, res) => {
+    try {
+      const input = insertUserSchema.parse(req.body);
+      const existingUser = await storage.getUserByUsername(input.username);
+      
+      if (existingUser) {
+        return res.status(409).json({ message: 'El usuario ya existe' });
+      }
+
+      const user = await storage.createUser(input);
+      const { password: _, ...userWithoutPassword } = user;
+      res.status(201).json(userWithoutPassword);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({
+          message: err.errors[0].message,
+          field: err.errors[0].path.join('.'),
+        });
+      }
+      throw err;
+    }
+  });
+
+  app.delete('/api/users/:id', async (req, res) => {
+    await storage.deleteUser(Number(req.params.id));
+    res.status(204).end();
+  });
+
   // Families
   app.get(api.families.list.path, async (_req, res) => {
     const families = await storage.getFamilies();
@@ -160,6 +220,22 @@ async function seedDatabase() {
       indications: "Dolor, fiebre, inflamación.",
       posology: "400 mg cada 6-8 horas.",
       administrationRoute: "Oral"
+    });
+  }
+
+  // Seed users
+  const existingUsers = await storage.getUsers();
+  if (existingUsers.length === 0) {
+    await storage.createUser({
+      username: 'admin',
+      password: 'admin123',
+      role: 'admin'
+    });
+
+    await storage.createUser({
+      username: 'usuario',
+      password: 'perfil123',
+      role: 'viewer'
     });
   }
 }
