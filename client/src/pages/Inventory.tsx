@@ -19,7 +19,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 
 export default function Inventory() {
-  const { isAdmin } = useAuth();
+  const { isAdmin, user } = useAuth();
   const [search, setSearch] = useState("");
   const [familyFilter, setFamilyFilter] = useState<string>("all");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -69,7 +69,7 @@ export default function Inventory() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h2 className="text-3xl font-display font-bold text-foreground">Gestión de Farmacia</h2>
-          <p className="text-muted-foreground">Gestión de stock y fichas técnicas.</p>
+          <p className="text-muted-foreground">Sede: <span className="capitalize font-semibold">{user?.inventoryLocation === 'maracay' ? 'SSIA Maracay' : 'SSIA Magdaleno'}</span></p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={handleExport} className="gap-2">

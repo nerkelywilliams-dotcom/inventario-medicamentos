@@ -12,9 +12,22 @@ export async function apiRequest(
   url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
+  const headers: Record<string, string> = data ? { "Content-Type": "application/json" } : {};
+  
+  // Agregar usuario al header si está disponible
+  const storedUser = localStorage.getItem('auth_user');
+  if (storedUser) {
+    try {
+      const user = JSON.parse(storedUser);
+      headers['x-user'] = Buffer.from(JSON.stringify(user)).toString('base64');
+    } catch (e) {
+      // Ignore JSON parse error
+    }
+  }
+
   const res = await fetch(url, {
     method,
-    headers: data ? { "Content-Type": "application/json" } : {},
+    headers,
     body: data ? JSON.stringify(data) : undefined,
     credentials: "include",
   });

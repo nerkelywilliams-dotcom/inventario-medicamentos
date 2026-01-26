@@ -7,6 +7,7 @@ export const families = pgTable("families", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   description: text("description"),
+  inventoryLocation: text("inventory_location").notNull().default("maracay"), // "maracay" o "magdaleno"
 });
 
 export const medications = pgTable("medications", {
@@ -22,6 +23,7 @@ export const medications = pgTable("medications", {
   indications: text("indications"),
   posology: text("posology"),
   administrationRoute: text("administration_route"),
+  inventoryLocation: text("inventory_location").notNull().default("maracay"), // "maracay" o "magdaleno"
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -48,6 +50,7 @@ export const users = pgTable("users", {
   username: text("username").notNull().unique(),
   password: text("password").notNull(),
   role: text("role").notNull().default("viewer"), // "admin" o "viewer"
+  inventoryLocation: text("inventory_location").notNull().default("maracay"), // "maracay" o "magdaleno"
 });
 
 export const insertUserSchema = createInsertSchema(users).omit({ id: true });

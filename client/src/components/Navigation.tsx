@@ -51,6 +51,7 @@ export function Navigation() {
           <p className="text-xs text-muted-foreground mb-2">Conectado como:</p>
           <p className="font-semibold text-sm text-foreground capitalize">{user?.username}</p>
           <p className="text-xs text-primary font-medium">{isAdmin ? '👑 Administrador' : '👤 Visualizador'}</p>
+          <p className="text-xs text-muted-foreground mt-2">Sede: {user?.inventoryLocation === 'maracay' ? '🏥 SSIA Maracay' : '🏥 SSIA Magdaleno'}</p>
         </div>
         <Button 
           variant="outline" 

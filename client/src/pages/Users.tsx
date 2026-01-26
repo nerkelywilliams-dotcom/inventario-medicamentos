@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,6 +12,7 @@ import { Plus, Trash2, Loader2 } from 'lucide-react';
 import type { User } from '@shared/schema';
 
 export default function Users() {
+  const { user: currentUser } = useAuth();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [newUsername, setNewUsername] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -90,7 +92,7 @@ export default function Users() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h2 className="text-3xl font-display font-bold text-foreground">Gestión de Usuarios</h2>
-          <p className="text-muted-foreground">Crea y administra perfiles de acceso.</p>
+          <p className="text-muted-foreground">Sede: <span className="capitalize font-semibold">{currentUser?.inventoryLocation === 'maracay' ? 'SSIA Maracay' : 'SSIA Magdaleno'}</span></p>
         </div>
         <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
           <DialogTrigger asChild>

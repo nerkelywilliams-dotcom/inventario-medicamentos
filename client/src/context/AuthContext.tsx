@@ -4,6 +4,7 @@ export interface AuthUser {
   id: number;
   username: string;
   role: 'admin' | 'viewer';
+  inventoryLocation: 'maracay' | 'magdaleno';
 }
 
 interface AuthContextType {
