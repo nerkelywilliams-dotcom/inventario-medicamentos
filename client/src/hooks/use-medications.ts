@@ -1,9 +1,15 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, buildUrl, type InsertMedication } from "@shared/routes";
+import { useAuth } from "@/context/AuthContext";
 import { z } from "zod";
 
+function encodeUserHeader(user: any): string {
+  return btoa(JSON.stringify(user));
+}
+
 export function useMedications(params?: { search?: string; familyId?: string }) {
-  const queryKey = [api.medications.list.path, params?.search, params?.familyId];
+  const { user } = useAuth();
+  const queryKey = [api.medications.list.path, params?.search, params?.familyId, user?.id];
   
   return useQuery({
     queryKey,
@@ -13,7 +19,15 @@ export function useMedications(params?: { search?: string; familyId?: string }) 
       if (params?.search) url.searchParams.append("search", params.search);
       if (params?.familyId) url.searchParams.append("familyId", params.familyId);
 
-      const res = await fetch(url.toString(), { credentials: "include" });
+      const headers: HeadersInit = {
+        "Content-Type": "application/json",
+      };
+      
+      if (user) {
+        headers["x-user"] = encodeUserHeader(user);
+      }
+
+      const res = await fetch(url.toString(), { headers, credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch medications");
       return api.medications.list.responses[200].parse(await res.json());
     },
@@ -21,11 +35,22 @@ export function useMedications(params?: { search?: string; familyId?: string }) 
 }
 
 export function useMedication(id: number) {
+  const { user } = useAuth();
+  
   return useQuery({
-    queryKey: [api.medications.get.path, id],
+    queryKey: [api.medications.get.path, id, user?.id],
     queryFn: async () => {
       const url = buildUrl(api.medications.get.path, { id });
-      const res = await fetch(url, { credentials: "include" });
+      
+      const headers: HeadersInit = {
+        "Content-Type": "application/json",
+      };
+      
+      if (user) {
+        headers["x-user"] = encodeUserHeader(user);
+      }
+      
+      const res = await fetch(url, { headers, credentials: "include" });
       if (res.status === 404) return null;
       if (!res.ok) throw new Error("Failed to fetch medication");
       return api.medications.get.responses[200].parse(await res.json());
@@ -36,6 +61,8 @@ export function useMedication(id: number) {
 
 export function useCreateMedication() {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
+  
   return useMutation({
     mutationFn: async (data: InsertMedication) => {
       // Ensure numeric fields are numbers, dates are Dates
@@ -44,9 +71,17 @@ export function useCreateMedication() {
         expirationDate: new Date(data.expirationDate), // Ensure Date object
       };
 
+      const headers: HeadersInit = {
+        "Content-Type": "application/json",
+      };
+      
+      if (user) {
+        headers["x-user"] = encodeUserHeader(user);
+      }
+
       const res = await fetch(api.medications.create.path, {
         method: api.medications.create.method,
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify(payload),
         credentials: "include",
       });
@@ -68,6 +103,8 @@ export function useCreateMedication() {
 
 export function useUpdateMedication() {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
+  
   return useMutation({
     mutationFn: async ({ id, ...updates }: { id: number } & Partial<InsertMedication>) => {
       const url = buildUrl(api.medications.update.path, { id });
@@ -78,9 +115,17 @@ export function useUpdateMedication() {
         payload.expirationDate = new Date(payload.expirationDate);
       }
 
+      const headers: HeadersInit = {
+        "Content-Type": "application/json",
+      };
+      
+      if (user) {
+        headers["x-user"] = encodeUserHeader(user);
+      }
+
       const res = await fetch(url, {
         method: api.medications.update.method,
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify(payload),
         credentials: "include",
       });
@@ -97,11 +142,23 @@ export function useUpdateMedication() {
 
 export function useDeleteMedication() {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
+  
   return useMutation({
     mutationFn: async (id: number) => {
       const url = buildUrl(api.medications.delete.path, { id });
+      
+      const headers: HeadersInit = {
+        "Content-Type": "application/json",
+      };
+      
+      if (user) {
+        headers["x-user"] = encodeUserHeader(user);
+      }
+      
       const res = await fetch(url, { 
         method: api.medications.delete.method,
+        headers,
         credentials: "include" 
       });
       if (!res.ok) throw new Error("Failed to delete medication");

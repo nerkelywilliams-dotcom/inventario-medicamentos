@@ -38,8 +38,8 @@ export const medicationsRelations = relations(medications, ({ one }) => ({
   }),
 }));
 
-export const insertFamilySchema = createInsertSchema(families).omit({ id: true });
-export const insertMedicationSchema = createInsertSchema(medications).omit({ id: true, createdAt: true });
+export const insertFamilySchema = createInsertSchema(families).omit({ id: true, inventoryLocation: true });
+export const insertMedicationSchema = createInsertSchema(medications).omit({ id: true, createdAt: true, inventoryLocation: true });
 
 export type Family = typeof families.$inferSelect;
 export type InsertFamily = z.infer<typeof insertFamilySchema>;
