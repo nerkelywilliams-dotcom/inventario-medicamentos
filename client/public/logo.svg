@@ -1,0 +1,25 @@
+<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <!-- Fondo gris -->
+  <circle cx="100" cy="100" r="100" fill="#e8e8e8"/>
+  
+  <!-- Teal/Verde izquierda -->
+  <path d="M 60 80 Q 40 60 40 100 Q 40 140 60 160 L 85 160 Q 65 140 65 100 Q 65 60 85 40 Z" fill="#1a9b7e"/>
+  
+  <!-- Azul oscuro derecha -->
+  <path d="M 110 60 Q 130 50 150 70 Q 160 85 155 100 Q 160 115 150 130 Q 130 150 110 140 L 115 100 Z" fill="#001e6e"/>
+  
+  <!-- Rojo cruz -->
+  <g fill="#e63946">
+    <rect x="90" y="50" width="20" height="30"/>
+    <rect x="85" y="65" width="30" height="20"/>
+  </g>
+  
+  <!-- Blanco detalles -->
+  <ellipse cx="75" cy="110" rx="8" ry="12" fill="#ffffff"/>
+  <path d="M 115 90 Q 120 85 125 90" stroke="#ffffff" stroke-width="2" fill="none"/>
+  
+  <!-- Texto "Aragua" -->
+  <text x="100" y="175" font-size="24" font-weight="bold" fill="#e63946" text-anchor="middle" font-family="Arial, sans-serif">
+    Aragua
+  </text>
+</svg>

@@ -23,20 +23,20 @@
   --popover-foreground: 222 47% 11%;
 
   /* Medical Blue */
-  --primary: 205 75% 45%; 
+  --primary: 228 48% 24%; /* Azul oscuro (logo) */
   --primary-foreground: 210 40% 98%;
 
-  /* Soft Teal/Green */
-  --secondary: 170 50% 96%;
-  --secondary-foreground: 175 75% 25%;
+  /* Teal/Verde del logo */
+  --secondary: 174 70% 40%;
+  --secondary-foreground: 210 40% 98%;
 
   --muted: 210 40% 96%;
   --muted-foreground: 215 16% 47%;
 
-  --accent: 210 40% 96%;
-  --accent-foreground: 222 47% 11%;
+  --accent: 354 80% 50%; /* Rojo (logo) */
+  --accent-foreground: 210 40% 98%;
 
-  --destructive: 0 84% 60%;
+  --destructive: 354 80% 50%;
   --destructive-foreground: 210 40% 98%;
 
   --border: 214 32% 91%;
