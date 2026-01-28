@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { LayoutDashboard, Pill, FileText, Settings, Activity, Users, LogOut } from "lucide-react";
+import { LayoutDashboard, Pill, FileText, Settings, Users, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -18,8 +18,9 @@ export function Navigation() {
   return (
     <nav className="hidden md:flex flex-col w-64 bg-card border-r border-border min-h-screen p-4 sticky top-0 h-screen">
       <div className="flex items-center gap-3 px-4 py-6 mb-6">
-        <div className="bg-primary/10 p-2 rounded-lg">
-          <Activity className="h-6 w-6 text-primary" />
+        {/* Contenedor del nuevo logo de Aragua */}
+        <div className="bg-white p-1 rounded-lg border border-border overflow-hidden h-11 w-11 flex items-center justify-center shadow-sm">
+          <img src="/image.png" alt="Logo Aragua" className="h-full w-full object-contain" />
         </div>
         <div>
           <h1 className="font-display font-bold text-lg leading-tight text-foreground">MediStock</h1>

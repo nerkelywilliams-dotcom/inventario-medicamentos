@@ -40,6 +40,7 @@ export default function Dashboard() {
       title: "Total Medicamentos",
       value: totalMedications,
       icon: Pill,
+      useImage: true,
       color: "text-blue-600",
       bg: "bg-blue-50",
       desc: "Registrados en sistema"
@@ -92,7 +93,11 @@ export default function Dashboard() {
                     <p className="text-xs text-muted-foreground mt-1">{stat.desc}</p>
                   </div>
                   <div className={`p-3 rounded-xl ${stat.bg}`}>
-                    <stat.icon className={`w-6 h-6 ${stat.color}`} />
+                    {stat.useImage ? (
+                      <img src="/image.png" alt="Logo" className="w-6 h-6 object-contain" />
+                    ) : (
+                      <stat.icon className={`w-6 h-6 ${stat.color}`} />
+                    )}
                   </div>
                 </div>
               </CardContent>
