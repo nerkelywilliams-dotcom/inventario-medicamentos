@@ -1,25 +1,24 @@
-<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
-  <!-- Fondo gris -->
-  <circle cx="100" cy="100" r="100" fill="#e8e8e8"/>
+<svg viewBox="0 0 240 240" xmlns="http://www.w3.org/2000/svg">
+  <!-- Fondo gris claro -->
+  <circle cx="120" cy="120" r="115" fill="#f0f0f0" stroke="#e0e0e0" stroke-width="2"/>
   
-  <!-- Teal/Verde izquierda -->
-  <path d="M 60 80 Q 40 60 40 100 Q 40 140 60 160 L 85 160 Q 65 140 65 100 Q 65 60 85 40 Z" fill="#1a9b7e"/>
+  <!-- Teal/Verde izquierda (S) -->
+  <path d="M 70 80 Q 50 60 50 110 Q 50 150 75 160 L 95 145 Q 75 140 75 110 Q 75 85 95 70 Z" fill="#1a9b7e"/>
+  <path d="M 75 160 Q 50 150 50 180 L 75 175 Z" fill="#17866f"/>
   
-  <!-- Azul oscuro derecha -->
-  <path d="M 110 60 Q 130 50 150 70 Q 160 85 155 100 Q 160 115 150 130 Q 130 150 110 140 L 115 100 Z" fill="#001e6e"/>
+  <!-- Azul oscuro derecha (S) -->
+  <path d="M 145 70 Q 165 60 180 80 Q 190 100 175 140 Q 165 155 145 160 L 145 135 Q 160 135 165 115 Q 170 95 160 85 L 145 95 Z" fill="#001f6e"/>
   
-  <!-- Rojo cruz -->
+  <!-- Cruz roja (símbolo médico) -->
   <g fill="#e63946">
-    <rect x="90" y="50" width="20" height="30"/>
-    <rect x="85" y="65" width="30" height="20"/>
+    <rect x="110" y="50" width="20" height="50" rx="3"/>
+    <rect x="90" y="70" width="60" height="20" rx="3"/>
   </g>
   
   <!-- Blanco detalles -->
-  <ellipse cx="75" cy="110" rx="8" ry="12" fill="#ffffff"/>
-  <path d="M 115 90 Q 120 85 125 90" stroke="#ffffff" stroke-width="2" fill="none"/>
+  <circle cx="80" cy="125" r="6" fill="#ffffff"/>
+  <path d="M 145 110 L 155 105 L 150 115" fill="#ffffff"/>
   
   <!-- Texto "Aragua" -->
-  <text x="100" y="175" font-size="24" font-weight="bold" fill="#e63946" text-anchor="middle" font-family="Arial, sans-serif">
-    Aragua
-  </text>
+  <text x="120" y="205" font-size="28" font-weight="bold" fill="#e63946" text-anchor="middle" font-family="Arial, sans-serif" letter-spacing="1">Aragua</text>
 </svg>
