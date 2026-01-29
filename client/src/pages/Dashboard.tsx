@@ -1,6 +1,6 @@
 import { useMedications } from "@/hooks/use-medications";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Pill, AlertCircle, AlertTriangle, PackageSearch } from "lucide-react";
+import { Pill, AlertCircle, AlertTriangle, PackageSearch, Clock, ChevronRight } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, Legend } from "recharts";
 import { differenceInDays, isAfter } from "date-fns";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -11,27 +11,25 @@ export default function Dashboard() {
 
   if (isLoading) {
     return (
-      <div className="p-8 space-y-8">
+      <div className="p-8 space-y-8 bg-[#f8fafc]">
         <Skeleton className="h-12 w-64 rounded-xl" />
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <Skeleton className="h-32 rounded-2xl" />
-          <Skeleton className="h-32 rounded-2xl" />
-          <Skeleton className="h-32 rounded-2xl" />
+          <Skeleton className="h-32 rounded-[2rem]" />
+          <Skeleton className="h-32 rounded-[2rem]" />
+          <Skeleton className="h-32 rounded-[2rem]" />
         </div>
-        <Skeleton className="h-96 rounded-2xl" />
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <Skeleton className="h-96 rounded-[2.5rem]" />
+            <Skeleton className="h-96 rounded-[2.5rem]" />
+        </div>
       </div>
     );
   }
 
+  // --- TU LÓGICA FUNCIONAL (INTACTA) ---
   const totalMedications = medications?.length || 0;
-  
   const now = new Date();
   const expired = medications?.filter(m => !isAfter(new Date(m.expirationDate), now)).length || 0;
-  const expiringSoon = medications?.filter(m => {
-    const expiry = new Date(m.expirationDate);
-    return isAfter(expiry, now) && differenceInDays(expiry, now) <= 30;
-  }).length || 0;
-  
   const lowStock = medications?.filter(m => m.quantity < 10).length || 0;
   const inStock = totalMedications - (medications?.filter(m => m.quantity === 0).length || 0);
 
@@ -40,43 +38,44 @@ export default function Dashboard() {
       title: "Total Medicamentos",
       value: totalMedications,
       icon: Pill,
-      useImage: true,
-      color: "text-blue-600",
-      bg: "bg-blue-50",
+      color: "bg-[#1e40af]", // Azul Institucional
+      text: "text-white",
       desc: "Registrados en sistema"
     },
     {
       title: "Stock Crítico",
       value: lowStock,
       icon: AlertTriangle,
-      color: "text-orange-600",
-      bg: "bg-orange-50",
+      color: "bg-[#f97316]", // Naranja Alerta
+      text: "text-white",
       desc: "< 10 unidades"
     },
     {
       title: "Vencidos",
       value: expired,
       icon: AlertCircle,
-      color: "text-red-600",
-      bg: "bg-red-50",
+      color: "bg-[#dc2626]", // Rojo Urgente
+      text: "text-white",
       desc: "Retirar inmediatamente"
     },
   ];
 
   const data = [
-    { name: 'Disponible', value: inStock, color: '#3b82f6' }, // blue-500
-    { name: 'Bajo Stock', value: lowStock, color: '#f97316' }, // orange-500
-    { name: 'Agotado', value: totalMedications - inStock, color: '#ef4444' }, // red-500
+    { name: 'Disponible', value: inStock, color: '#1e40af' }, 
+    { name: 'Bajo Stock', value: lowStock, color: '#f97316' }, 
+    { name: 'Agotado', value: totalMedications - inStock, color: '#dc2626' }, 
   ];
 
   return (
-    <div className="space-y-8 animate-fade-in">
-      <div>
-        <h2 className="text-3xl font-display font-bold text-foreground mb-2">Panel Principal</h2>
-        <p className="text-muted-foreground">Resumen general del estado del inventario farmacéutico.</p>
+    <div className="space-y-10 p-2 md:p-6 bg-[#f8fafc] min-h-screen animate-fade-in">
+      {/* CABECERA */}
+      <div className="flex flex-col gap-1">
+        <h2 className="text-4xl font-black text-slate-800 tracking-tighter">Panel Principal</h2>
+        <p className="text-slate-500 font-medium italic">Sede Magdaleno • Gestión de Inventario Farmacéutico</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      {/* TARJETAS DE MÉTRICAS CON TU DISEÑO REQUERIDO */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
         {stats.map((stat, i) => (
           <motion.div
             key={stat.title}
@@ -84,94 +83,106 @@ export default function Dashboard() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: i * 0.1 }}
           >
-            <Card className="hover:shadow-lg transition-shadow duration-300 border-border/50">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground mb-1">{stat.title}</p>
-                    <h3 className="text-3xl font-bold font-display">{stat.value}</h3>
-                    <p className="text-xs text-muted-foreground mt-1">{stat.desc}</p>
-                  </div>
-                  <div className={`p-3 rounded-xl ${stat.bg}`}>
-                    {stat.useImage ? (
-                      <img src="/image.png" alt="Logo" className="w-6 h-6 object-contain" />
-                    ) : (
-                      <stat.icon className={`w-6 h-6 ${stat.color}`} />
-                    )}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+            <div className={`${stat.color} ${stat.text} p-8 rounded-[2.5rem] shadow-xl shadow-slate-200 relative overflow-hidden group transition-transform hover:scale-[1.02]`}>
+              <div className="relative z-10">
+                <p className="text-[10px] font-bold uppercase tracking-[0.2em] opacity-80 mb-2">{stat.title}</p>
+                <h3 className="text-5xl font-black mb-1">{stat.value}</h3>
+                <p className="text-[10px] font-bold uppercase opacity-70 tracking-wider">{stat.desc}</p>
+              </div>
+              <stat.icon className="absolute right-[-10px] bottom-[-10px] h-28 w-28 opacity-10 rotate-12 group-hover:rotate-0 transition-transform duration-500" />
+            </div>
           </motion.div>
         ))}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <Card className="border-border/50 shadow-sm">
+        {/* GRÁFICO CIRCULAR */}
+        <Card className="border-none shadow-sm rounded-[3rem] p-4 bg-white">
           <CardHeader>
-            <CardTitle>Estado del Inventario</CardTitle>
+            <CardTitle className="text-xl font-black text-slate-800 flex items-center gap-2">
+                <div className="h-2 w-8 bg-blue-600 rounded-full" />
+                Estado del Inventario
+            </CardTitle>
           </CardHeader>
-          <CardContent className="h-[300px]">
+          <CardContent className="h-[320px]">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
                   data={data}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={60}
-                  outerRadius={80}
-                  paddingAngle={5}
+                  cx="50%" cy="50%"
+                  innerRadius={80}
+                  outerRadius={105}
+                  paddingAngle={8}
                   dataKey="value"
+                  stroke="none"
                 >
                   {data.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={entry.color} />
                   ))}
                 </Pie>
-                <RechartsTooltip />
-                <Legend verticalAlign="bottom" height={36} />
+                <RechartsTooltip 
+                    contentStyle={{ borderRadius: '15px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                />
+                <Legend verticalAlign="bottom" height={36} iconType="circle" />
               </PieChart>
             </ResponsiveContainer>
           </CardContent>
         </Card>
 
-        <Card className="border-border/50 shadow-sm">
+        {/* PRÓXIMOS A VENCER */}
+        <Card className="border-none shadow-sm rounded-[3rem] p-4 bg-white">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <AlertCircle className="w-5 h-5 text-red-500" />
+            <CardTitle className="text-xl font-black text-slate-800 flex items-center gap-2">
+              <Clock className="w-5 h-5 text-red-500" />
               Próximos a Vencer
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {expiringSoon === 0 && expired === 0 ? (
-              <div className="flex flex-col items-center justify-center h-[250px] text-muted-foreground">
-                <PackageSearch className="w-12 h-12 mb-3 opacity-20" />
-                <p>No hay medicamentos próximos a vencer</p>
+            {expired === 0 && medications?.filter(m => {
+                const expiry = new Date(m.expirationDate);
+                return isAfter(expiry, now) && differenceInDays(expiry, now) <= 60;
+            }).length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-[280px] text-slate-300">
+                <PackageSearch className="w-16 h-16 mb-4 opacity-10" />
+                <p className="font-bold uppercase text-xs tracking-widest">Sin alertas de vencimiento</p>
               </div>
             ) : (
-              <div className="space-y-4">
+              <div className="space-y-3">
                 {medications?.filter(m => {
                    const expiry = new Date(m.expirationDate);
-                   // Show expired or expiring in next 60 days
                    return differenceInDays(expiry, now) <= 60;
                 })
                 .sort((a, b) => new Date(a.expirationDate).getTime() - new Date(b.expirationDate).getTime())
                 .slice(0, 5)
-                .map(med => (
-                  <div key={med.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/30 border border-border/50">
-                    <div>
-                      <p className="font-medium text-sm">{med.name}</p>
-                      <p className="text-xs text-muted-foreground">{med.presentation}</p>
+                .map(med => {
+                  const daysLeft = differenceInDays(new Date(med.expirationDate), now);
+                  const isExpired = daysLeft <= 0;
+
+                  return (
+                    <div key={med.id} className="flex items-center justify-between p-4 rounded-2xl bg-slate-50 border border-slate-100 group hover:border-blue-200 transition-all">
+                      <div className="flex items-center gap-4">
+                        <div className={`h-10 w-10 rounded-xl flex items-center justify-center shadow-sm ${isExpired ? 'bg-red-50 text-red-500' : 'bg-white text-blue-600'}`}>
+                           <Pill size={18} />
+                        </div>
+                        <div>
+                          <p className="font-black text-slate-800 text-sm leading-tight">{med.name}</p>
+                          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter">{med.presentation}</p>
+                        </div>
+                      </div>
+                      <div className="text-right flex items-center gap-3">
+                        <div>
+                          <p className={`text-sm font-black ${isExpired ? 'text-red-600' : 'text-orange-600'}`}>
+                             {daysLeft} días
+                          </p>
+                          <p className="text-[8px] font-black text-slate-300 uppercase tracking-widest">
+                            {isExpired ? 'Vencido' : 'Restantes'}
+                          </p>
+                        </div>
+                        <ChevronRight size={14} className="text-slate-200" />
+                      </div>
                     </div>
-                    <div className="text-right">
-                       <span className={`text-xs font-bold ${
-                         !isAfter(new Date(med.expirationDate), now) ? 'text-red-600' : 'text-amber-600'
-                       }`}>
-                         {differenceInDays(new Date(med.expirationDate), now)} días
-                       </span>
-                       <p className="text-[10px] text-muted-foreground">restantes</p>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </CardContent>
