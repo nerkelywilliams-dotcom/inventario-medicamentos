@@ -1,25 +1,30 @@
 import React from "react";
 import { useForm } from "react-hook-form";
 import { useAuth } from "../context/AuthContext"; 
+import { useLocation } from "wouter"; // Importamos el navegador de rutas
 import { User, Lock, Loader2, AlertCircle } from "lucide-react"; 
 
 export default function Login() {
-  // Extraemos lo que el contexto realmente ofrece
-  // Si tu contexto usa nombres diferentes, aquí los adaptamos
   const auth = useAuth();
+  const [, setLocation] = useLocation(); // Esta es la función para cambiar de página
   
   const { register, handleSubmit, formState: { isSubmitting } } = useForm();
 
   const onSubmit = async (data: any) => {
     try {
-      // Intentamos usar 'login' o 'loginMutation.mutate' según lo que exista
+      // 1. Intentamos el login
       if (auth && 'login' in auth) {
         await (auth as any).login(data);
       } else if (auth && 'loginMutation' in auth) {
         await (auth as any).loginMutation.mutateAsync(data);
       }
+      
+      // 2. SI EL LOGIN TIENE ÉXITO -> Forzamos ir al Panel Principal
+      setLocation("/"); 
+      
     } catch (error) {
-      console.error("Error al iniciar sesión", error);
+      console.error("Error al iniciar sesión:", error);
+      // Aquí podrías mostrar una alerta si fallan las credenciales
     }
   };
 
@@ -32,9 +37,9 @@ export default function Login() {
           <div className="absolute top-[-50px] left-[-50px] h-40 w-40 rounded-full bg-white/10 blur-3xl" />
           <div className="relative z-10">
             <h2 className="text-4xl font-extrabold mb-4 tracking-tighter uppercase">Bienvenido</h2>
-            <h3 className="text-xl font-medium mb-8 text-emerald-100 italic border-b border-white/20 pb-4">Servicio Social de Iglesias Aragua</h3>
+            <h3 className="text-xl font-medium mb-8 text-emerald-100 italic border-b border-white/20 pb-4">SSIA Aragua</h3>
             <p className="text-sm leading-relaxed text-blue-50 opacity-90 border-l-4 border-emerald-400 pl-4">
-              "Abocados a mostrar el amor de Dios al prójimo a través de la acción social."
+              "Mostrando el amor de Dios al prójimo a través de la acción social."
             </p>
           </div>
         </div>
@@ -77,7 +82,12 @@ export default function Login() {
                     disabled={isSubmitting}
                     className="w-full h-14 bg-red-600 hover:bg-red-700 text-white font-bold rounded-2xl shadow-lg shadow-red-200 transition-all active:scale-[0.98] flex items-center justify-center disabled:opacity-50 mt-4"
                 >
-                    {isSubmitting ? <Loader2 className="animate-spin h-6 w-6" /> : "INGRESAR AL SISTEMA"}
+                    {isSubmitting ? (
+                      <div className="flex items-center gap-2">
+                        <Loader2 className="animate-spin h-5 w-5" />
+                        <span>INGRESANDO...</span>
+                      </div>
+                    ) : "INGRESAR AL SISTEMA"}
                 </button>
             </form>
         </div>
