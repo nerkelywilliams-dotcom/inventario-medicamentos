@@ -11,8 +11,6 @@ export default function Dashboard() {
   const lowStock = medications?.filter(m => m.quantity < 10).length || 0;
   const expired = medications?.filter(m => !isAfter(new Date(m.expirationDate), now)).length || 0;
 
-  // ESTOS SON LOS COLORES DE LA FOTO:
-  // 1. Azul Rey/Vibrante | 2. Azul Oscuro/Petróleo | 3. Rojo Vivo
   const stats = [
     { title: "TOTAL MEDICAMENTOS", value: total, color: "bg-[#2b4cc4]", icon: Pill }, 
     { title: "STOCK CRÍTICO", value: lowStock, color: "bg-[#1a2b4b]", icon: AlertTriangle }, 
@@ -26,13 +24,13 @@ export default function Dashboard() {
   ];
 
   return (
-    <div className="p-10 bg-white min-h-screen space-y-12">
+    <div className="p-10 bg-white min-h-screen space-y-10">
       <div className="flex flex-col gap-1">
         <h2 className="text-4xl font-black text-[#1a2b4b] tracking-tight">Panel Principal</h2>
         <p className="text-slate-400 font-bold italic">Sede Magdaleno • Gestión de Inventario Farmacéutico</p>
       </div>
 
-      {/* TARJETAS CON LA TRIPLETA: AZUL CLARO - AZUL OSCURO - ROJO */}
+      {/* TARJETAS DE ESTADÍSTICAS */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
         {stats.map((stat) => (
           <div key={stat.title} className={`${stat.color} text-white p-10 rounded-[2.5rem] relative overflow-hidden shadow-2xl shadow-slate-200 h-52 flex flex-col justify-center`}>
@@ -47,6 +45,7 @@ export default function Dashboard() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
+        {/* GRÁFICO */}
         <div className="bg-[#fcfdfe] rounded-[3.5rem] p-12 border border-slate-50 shadow-sm">
           <div className="flex items-center gap-4 mb-10">
             <div className="h-2 w-12 bg-[#2b4cc4] rounded-full" />
@@ -65,6 +64,7 @@ export default function Dashboard() {
           </div>
         </div>
 
+        {/* LISTA DE VENCIMIENTO CORREGIDA */}
         <div className="bg-[#fcfdfe] rounded-[3.5rem] p-12 border border-slate-50 shadow-sm">
           <div className="flex items-center gap-3 mb-10">
             <Clock className="text-[#dc2626] w-7 h-7" />
@@ -74,19 +74,27 @@ export default function Dashboard() {
             {medications?.filter(m => differenceInDays(new Date(m.expirationDate), now) <= 60).slice(0, 5).map(med => {
               const days = differenceInDays(new Date(med.expirationDate), now);
               return (
-                <div key={med.id} className="flex items-center justify-between p-6 bg-white rounded-[2rem] border border-slate-100 shadow-sm">
-                  <div className="flex items-center gap-5">
-                    <div className="h-12 w-12 bg-red-50 text-[#dc2626] rounded-2xl flex items-center justify-center">
-                      <Pill size={24} className="rotate-45" />
+                <div key={med.id} className="flex items-center justify-between p-5 bg-white rounded-2xl border border-slate-100 shadow-sm">
+                  <div className="flex items-center gap-4">
+                    {/* Icono más pequeño y estilizado */}
+                    <div className="h-10 w-10 bg-rose-50 text-[#dc2626] rounded-xl flex items-center justify-center shrink-0">
+                      <Pill size={20} className="rotate-45" />
                     </div>
                     <div>
-                      <p className="font-black text-[#1a2b4b] text-lg leading-tight">{med.name}</p>
-                      <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">{med.presentation}</p>
+                      {/* Nombre del medicamento: El foco principal */}
+                      <p className="font-bold text-[#1a2b4b] text-base leading-tight">{med.name}</p>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">{med.presentation}</p>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className="text-xl font-black text-[#dc2626] leading-none">{days} días</p>
-                    <p className="text-[9px] font-bold text-slate-300 uppercase tracking-tighter mt-1">Vencido</p>
+                  
+                  {/* Bloque de fecha: Proporcionado y alineado */}
+                  <div className="text-right shrink-0 min-w-[80px]">
+                    <p className="text-base font-black text-[#dc2626] leading-none">
+                      {days} días
+                    </p>
+                    <p className="text-[8px] font-bold text-slate-300 uppercase tracking-tighter mt-1">
+                      Vencido
+                    </p>
                   </div>
                 </div>
               );
