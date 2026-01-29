@@ -32,7 +32,7 @@ export default function Login() {
           <div className="absolute top-[-50px] left-[-50px] h-40 w-40 rounded-full bg-white/10 blur-3xl" />
           <div className="relative z-10">
             <h2 className="text-4xl font-extrabold mb-4 tracking-tighter uppercase">Bienvenido</h2>
-            <h3 className="text-xl font-medium mb-8 text-emerald-100 italic border-b border-white/20 pb-4">SSIA Aragua</h3>
+            <h3 className="text-xl font-medium mb-8 text-emerald-100 italic border-b border-white/20 pb-4">Servicio Social de Iglesias Aragua</h3>
             <p className="text-sm leading-relaxed text-blue-50 opacity-90 border-l-4 border-emerald-400 pl-4">
               "Abocados a mostrar el amor de Dios al prójimo a través de la acción social."
             </p>
