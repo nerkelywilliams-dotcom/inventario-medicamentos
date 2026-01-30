@@ -12,6 +12,7 @@ import Inventory from "@/pages/Inventory";
 import Families from "@/pages/Families";
 import Users from "@/pages/Users";
 import Login from "@/pages/Login";
+import Settings from "@/pages/Settings"; // <--- Importación añadida
 
 type UserRole = 'admin' | 'viewer';
 
@@ -72,12 +73,16 @@ function Router() {
           <Switch>
             <Route path="/" component={Dashboard} />
             <Route path="/inventory" component={Inventory} />
+            <Route path="/settings" component={Settings} /> {/* <--- Ruta de Configuración añadida */}
+            
             <Route path="/families">
               {user.role === 'admin' ? <Families /> : <NotFound />}
             </Route>
+            
             <Route path="/users">
               {user.role === 'admin' ? <Users /> : <NotFound />}
             </Route>
+            
             <Route component={NotFound} />
           </Switch>
         </div>
