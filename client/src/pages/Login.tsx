@@ -1,13 +1,16 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useAuth } from "../context/AuthContext"; 
 import { useLocation } from "wouter"; 
-import { User, Lock, Loader2 } from "lucide-react"; 
+import { User, Lock, Loader2, Eye, EyeOff } from "lucide-react"; 
 
 export default function Login() {
   const { user, login } = useAuth();
   const [, setLocation] = useLocation();
   const { register, handleSubmit, formState: { isSubmitting } } = useForm();
+  
+  // Nuevo estado para la visibilidad de la contraseña
+  const [showPassword, setShowPassword] = useState(false);
 
   // Si ya detecta que entraste, te mueve al Home
   useEffect(() => {
@@ -70,11 +73,21 @@ export default function Login() {
                     <div className="relative">
                         <Lock className="absolute left-4 top-3 h-5 w-5 text-slate-300" />
                         <input 
-                            type="password"
+                            // Aquí cambiamos el tipo dinámicamente
+                            type={showPassword ? "text" : "password"}
                             {...register("password", { required: true })}
-                            className="w-full pl-12 h-12 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all"
+                            // Agregué 'pr-12' para que el texto no se monte sobre el ojito
+                            className="w-full pl-12 pr-12 h-12 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all"
                             placeholder="••••••••"
                         />
+                        {/* Botón del ojito */}
+                        <button
+                            type="button"
+                            onClick={() => setShowPassword(!showPassword)}
+                            className="absolute right-4 top-3 text-slate-300 hover:text-slate-500 transition-colors focus:outline-none"
+                        >
+                            {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                        </button>
                     </div>
                 </div>
 
