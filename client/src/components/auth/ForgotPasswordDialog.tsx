@@ -1,9 +1,9 @@
-import { useState } from "react";
+import React, { useState } from "react"; // Añadido React aquí
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Mail, KeyRound, ArrowRight, CheckCircle2, Loader2 } from "lucide-react";
+import { Mail, KeyRound, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 export function ForgotPasswordDialog() {
@@ -15,15 +15,19 @@ export function ForgotPasswordDialog() {
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
 
-  // Simulación de envío de correo (Aquí conectarías tu API real)
+  // Simulación de envío de correo
   const handleSendCode = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    // TODO: await api.post('/auth/forgot-password', { email })
+    
+    // Aquí es donde conectarás con tu servicio de Resend en el futuro
     setTimeout(() => {
       setIsLoading(false);
       setStep(2);
-      toast({ title: "Código enviado", description: "Revisa tu bandeja de entrada." });
+      toast({ 
+        title: "Código enviado", 
+        description: `Se ha enviado un código de seguridad a ${email}` 
+      });
     }, 1500);
   };
 
@@ -31,64 +35,76 @@ export function ForgotPasswordDialog() {
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    // TODO: await api.post('/auth/reset-password', { email, code, newPassword })
+
     setTimeout(() => {
       setIsLoading(false);
       setOpen(false);
-      setStep(1);
-      toast({ title: "¡Éxito!", description: "Tu contraseña ha sido actualizada.", variant: "default" });
+      setStep(1); // Reiniciamos el estado para la próxima vez
+      toast({ 
+        title: "¡Contraseña actualizada!", 
+        description: "Ya puedes iniciar sesión con tu nueva clave.", 
+        variant: "default" 
+      });
     }, 1500);
   };
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <button type="button" className="text-sm font-bold text-[#2b4cc4] hover:underline hover:text-[#1a2b4b] transition-colors">
+        <button 
+          type="button" 
+          className="text-xs font-bold text-[#1e40af] hover:text-[#059669] transition-colors uppercase tracking-widest"
+        >
           ¿Olvidaste tu contraseña?
         </button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-md rounded-[2rem] border-none shadow-2xl p-8">
+      
+      <DialogContent className="sm:max-w-md rounded-[2.5rem] border-none shadow-2xl p-8 bg-white">
         <DialogHeader>
-          <DialogTitle className="text-2xl font-black text-[#1a2b4b] text-center">
+          <DialogTitle className="text-2xl font-black text-slate-800 text-center">
             {step === 1 ? "Recuperar Acceso" : "Validar Código"}
           </DialogTitle>
-          <p className="text-center text-slate-400 text-sm font-medium">
+          <p className="text-center text-slate-400 text-sm font-medium mt-2">
             {step === 1 
-              ? "Ingresa tu correo para recibir un código de seguridad." 
-              : `Hemos enviado un código a ${email}`}
+              ? "Ingresa tu correo institucional para recibir un código." 
+              : `Ingresa el código enviado a ${email}`}
           </p>
         </DialogHeader>
 
         {step === 1 ? (
           <form onSubmit={handleSendCode} className="space-y-6 mt-4">
             <div className="space-y-2">
-              <Label className="text-[#1a2b4b] font-bold ml-1">Correo Electrónico</Label>
+              <Label className="text-slate-600 font-bold ml-1 text-[10px] uppercase tracking-wider">Correo Electrónico</Label>
               <div className="relative">
-                <Mail className="absolute left-4 top-3 h-5 w-5 text-slate-400" />
+                <Mail className="absolute left-4 top-3 h-5 w-5 text-slate-300" />
                 <Input 
                   type="email" 
-                  placeholder="doctor@pharmasys.com" 
-                  className="pl-12 h-12 rounded-xl bg-slate-50 border-slate-200 focus:border-[#2b4cc4] focus:ring-[#2b4cc4]"
+                  placeholder="ejemplo@iglesiasaragua.org" 
+                  className="pl-12 h-12 rounded-xl bg-slate-50 border-slate-200 focus:border-emerald-500 focus:ring-emerald-500/20 transition-all"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
                 />
               </div>
             </div>
-            <Button type="submit" className="w-full h-12 rounded-xl bg-[#2b4cc4] hover:bg-[#1a2b4b] font-bold text-lg shadow-lg shadow-blue-900/20" disabled={isLoading}>
-              {isLoading ? <Loader2 className="animate-spin" /> : "Enviar Código"}
+            <Button 
+              type="submit" 
+              className="w-full h-12 rounded-xl bg-[#1e40af] hover:bg-[#059669] font-bold text-white shadow-lg transition-all" 
+              disabled={isLoading}
+            >
+              {isLoading ? <Loader2 className="animate-spin h-5 w-5" /> : "ENVIAR CÓDIGO"}
             </Button>
           </form>
         ) : (
           <form onSubmit={handleResetPassword} className="space-y-6 mt-4">
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label className="text-[#1a2b4b] font-bold ml-1">Código de 6 dígitos</Label>
+                <Label className="text-slate-600 font-bold ml-1 text-[10px] uppercase tracking-wider">Código de Seguridad</Label>
                 <div className="relative">
-                  <KeyRound className="absolute left-4 top-3 h-5 w-5 text-slate-400" />
+                  <KeyRound className="absolute left-4 top-3 h-5 w-5 text-slate-300" />
                   <Input 
-                    placeholder="123456" 
-                    className="pl-12 h-12 rounded-xl bg-slate-50 border-slate-200 tracking-widest font-mono text-lg"
+                    placeholder="000000" 
+                    className="pl-12 h-12 rounded-xl bg-slate-50 border-slate-200 tracking-[0.5em] font-mono text-lg text-center"
                     value={code}
                     onChange={(e) => setCode(e.target.value)}
                     maxLength={6}
@@ -97,21 +113,30 @@ export function ForgotPasswordDialog() {
                 </div>
               </div>
               <div className="space-y-2">
-                <Label className="text-[#1a2b4b] font-bold ml-1">Nueva Contraseña</Label>
+                <Label className="text-slate-600 font-bold ml-1 text-[10px] uppercase tracking-wider">Nueva Contraseña</Label>
                 <Input 
                   type="password"
-                  className="h-12 rounded-xl bg-slate-50 border-slate-200"
+                  placeholder="••••••••"
+                  className="h-12 rounded-xl bg-slate-50 border-slate-200 focus:border-emerald-500"
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   required
                 />
               </div>
             </div>
-            <Button type="submit" className="w-full h-12 rounded-xl bg-[#2b4cc4] hover:bg-[#1a2b4b] font-bold text-lg shadow-lg shadow-blue-900/20" disabled={isLoading}>
-              {isLoading ? <Loader2 className="animate-spin" /> : "Restablecer Contraseña"}
+            <Button 
+              type="submit" 
+              className="w-full h-12 rounded-xl bg-[#059669] hover:bg-[#1e40af] font-bold text-white shadow-lg transition-all" 
+              disabled={isLoading}
+            >
+              {isLoading ? <Loader2 className="animate-spin h-5 w-5" /> : "RESTABLECER CONTRASEÑA"}
             </Button>
-            <button type="button" onClick={() => setStep(1)} className="w-full text-center text-sm text-slate-400 hover:text-[#1a2b4b] font-bold mt-2">
-              Volver atrás
+            <button 
+              type="button" 
+              onClick={() => setStep(1)} 
+              className="w-full text-center text-xs text-slate-400 hover:text-slate-600 font-bold mt-2 underline"
+            >
+              Usar otro correo
             </button>
           </form>
         )}
