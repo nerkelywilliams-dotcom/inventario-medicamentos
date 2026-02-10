@@ -30,16 +30,25 @@ export default function Dashboard() {
         <p className="text-slate-400 font-bold italic">Sede Magdaleno • Gestión de Inventario Farmacéutico</p>
       </div>
 
-      {/* TARJETAS DE ESTADÍSTICAS */}
+      {/* TARJETAS DE ESTADÍSTICAS CON ANIMACIÓN DE CURSOR */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
         {stats.map((stat) => (
-          <div key={stat.title} className={`${stat.color} text-white p-10 rounded-[2.5rem] relative overflow-hidden shadow-2xl shadow-slate-200 h-52 flex flex-col justify-center`}>
+          <div 
+            key={stat.title} 
+            // 1. Agregamos 'group' aquí para que el hijo detecte el hover del padre
+            // 2. Agregamos una pequeña transición a la tarjeta completa
+            className={`${stat.color} text-white p-10 rounded-[2.5rem] relative overflow-hidden shadow-2xl shadow-slate-200 h-52 flex flex-col justify-center group transition-all duration-300 hover:scale-[1.02] cursor-default`}
+          >
             <div className="relative z-10">
               <p className="text-[10px] font-black tracking-[0.2em] opacity-80 mb-2 uppercase">{stat.title}</p>
               <h3 className="text-7xl font-black mb-1 leading-none">{stat.value}</h3>
               <p className="text-[9px] font-bold opacity-70 uppercase tracking-widest">Registrados en sistema</p>
             </div>
-            <stat.icon className="absolute right-[-15px] bottom-[-15px] h-36 w-36 opacity-10 rotate-12" />
+            
+            {/* 3. Agregamos las clases 'group-hover' para animar el icono */}
+            <stat.icon 
+                className="absolute right-[-15px] bottom-[-15px] h-36 w-36 opacity-10 rotate-12 transition-transform duration-500 ease-out group-hover:scale-125 group-hover:-translate-x-4 group-hover:-translate-y-4 group-hover:rotate-[24deg]" 
+            />
           </div>
         ))}
       </div>
@@ -64,7 +73,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* LISTA DE VENCIMIENTO CORREGIDA */}
+        {/* LISTA DE VENCIMIENTO */}
         <div className="bg-[#fcfdfe] rounded-[3.5rem] p-12 border border-slate-50 shadow-sm">
           <div className="flex items-center gap-3 mb-10">
             <Clock className="text-[#dc2626] w-7 h-7" />
@@ -74,26 +83,23 @@ export default function Dashboard() {
             {medications?.filter(m => differenceInDays(new Date(m.expirationDate), now) <= 60).slice(0, 5).map(med => {
               const days = differenceInDays(new Date(med.expirationDate), now);
               return (
-                <div key={med.id} className="flex items-center justify-between p-5 bg-white rounded-2xl border border-slate-100 shadow-sm">
+                <div key={med.id} className="flex items-center justify-between p-5 bg-white rounded-2xl border border-slate-100 shadow-sm transition-colors hover:border-red-100 hover:bg-red-50/10">
                   <div className="flex items-center gap-4">
-                    {/* Icono más pequeño y estilizado */}
                     <div className="h-10 w-10 bg-rose-50 text-[#dc2626] rounded-xl flex items-center justify-center shrink-0">
                       <Pill size={20} className="rotate-45" />
                     </div>
                     <div>
-                      {/* Nombre del medicamento: El foco principal */}
                       <p className="font-bold text-[#1a2b4b] text-base leading-tight">{med.name}</p>
                       <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">{med.presentation}</p>
                     </div>
                   </div>
                   
-                  {/* Bloque de fecha: Proporcionado y alineado */}
                   <div className="text-right shrink-0 min-w-[80px]">
-                    <p className="text-base font-black text-[#dc2626] leading-none">
+                    <p className={`text-base font-black leading-none ${days < 0 ? 'text-[#dc2626]' : 'text-orange-500'}`}>
                       {days} días
                     </p>
                     <p className="text-[8px] font-bold text-slate-300 uppercase tracking-tighter mt-1">
-                      Vencido
+                      {days < 0 ? 'Vencido' : 'Por vencer'}
                     </p>
                   </div>
                 </div>
