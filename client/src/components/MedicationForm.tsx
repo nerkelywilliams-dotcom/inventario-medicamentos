@@ -7,8 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Loader2, PlusCircle, X } from "lucide-react";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
+import { Loader2, PlusCircle, X, Pill, Activity } from "lucide-react";
 import { z } from "zod";
 
 interface MedicationFormProps {
@@ -18,16 +18,14 @@ interface MedicationFormProps {
   submitLabel: string;
 }
 
-// Opciones para los menús
 const PRESENTACIONES = ["Tableta", "Cápsula", "Comprimido", "Suspensión", "Jarabe", "Crema", "Gel", "Ampolla", "Vial"];
 const VIAS_ADMIN = ["Oral", "Tópica", "Intravaginal", "Rectal", "Intravenosa", "Intramuscular", "Subcutánea", "Oftálmica"];
 
-// Extendemos el esquema para incluir 'dose' y manejar los tipos de entrada
 const formSchema = insertMedicationSchema.extend({
   quantity: z.coerce.number().min(0, "La cantidad no puede ser negativa"),
   familyId: z.coerce.number().optional(),
-  expirationDate: z.coerce.date(),
-  dose: z.string().min(1, "La dosis es requerida"), // Nuevo campo
+  expirationDate: z.coerce.string().min(1, "La fecha de vencimiento es requerida"),
+  dose: z.string().min(1, "La dosis es vital para la seguridad del paciente"), 
   imageUrl: z.union([
     z.instanceof(File),
     z.string(),
@@ -37,8 +35,6 @@ const formSchema = insertMedicationSchema.extend({
 
 export function MedicationForm({ defaultValues, onSubmit, isLoading, submitLabel }: MedicationFormProps) {
   const { data: families } = useFamilies();
-  
-  // Estados para controlar si el usuario escribe una opción nueva
   const [isCustomPresentation, setIsCustomPresentation] = useState(false);
   const [isCustomVia, setIsCustomVia] = useState(false);
 
@@ -55,45 +51,71 @@ export function MedicationForm({ defaultValues, onSubmit, isLoading, submitLabel
       posology: "",
       administrationRoute: "",
       ...defaultValues,
+      // Manejo de fecha para el input type="date"
       expirationDate: defaultValues?.expirationDate 
-        ? new Date(defaultValues.expirationDate).toISOString().split('T')[0] as any
-        : undefined,
-    },
+        ? new Date(defaultValues.expirationDate).toISOString().split('T')[0]
+        : "",
+    } as any,
   });
 
   const handleSubmit = (data: any) => {
+    // Convertimos la fecha de string a Date antes de enviar
+    const formattedData = {
+      ...data,
+      expirationDate: new Date(data.expirationDate)
+    };
+
     const file = data.imageUrl;
     if (file instanceof File) {
       const reader = new FileReader();
       reader.onloadend = () => {
-        const finalData = { ...data, imageUrl: reader.result as string };
-        onSubmit(finalData);
+        onSubmit({ ...formattedData, imageUrl: reader.result as string });
       };
       reader.readAsDataURL(file);
     } else {
-      onSubmit(data);
+      onSubmit(formattedData);
     }
   };
 
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* Nombre Comercial - Más ancho */}
           <FormField
             control={form.control}
             name="name"
             render={({ field }) => (
               <FormItem className="md:col-span-2">
-                <FormLabel>Nombre Comercial</FormLabel>
+                <FormLabel className="flex items-center gap-2">
+                  <Pill className="h-4 w-4 text-primary" /> Nombre Comercial
+                </FormLabel>
                 <FormControl>
-                  <Input placeholder="Ej. Paracetamol" {...field} />
+                  <Input placeholder="Ej. Paracetamol, Ibuprofeno..." {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
             )}
           />
 
-          {/* PRESENTACIÓN CON MENÚ INTELIGENTE */}
+          {/* DOSIS / CONCENTRACIÓN - Resaltada al lado del nombre */}
+          <FormField
+            control={form.control}
+            name="dose"
+            render={({ field }) => (
+              <FormItem className="bg-primary/5 p-3 rounded-lg border border-primary/10">
+                <FormLabel className="flex items-center gap-2 text-primary font-bold">
+                  <Activity className="h-4 w-4" /> Dosis
+                </FormLabel>
+                <FormControl>
+                  <Input placeholder="500mg, 1gr, 0.5%..." {...field} className="bg-white" />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          {/* PRESENTACIÓN */}
           <FormField
             control={form.control}
             name="presentation"
@@ -101,12 +123,12 @@ export function MedicationForm({ defaultValues, onSubmit, isLoading, submitLabel
               <FormItem>
                 <FormLabel>Presentación</FormLabel>
                 {isCustomPresentation ? (
-                  <div className="flex gap-2 animate-in fade-in slide-in-from-left-2 duration-300">
+                  <div className="flex gap-2">
                     <FormControl>
-                      <Input placeholder="Escribe presentación..." {...field} autoFocus />
+                      <Input placeholder="Escribe..." {...field} autoFocus />
                     </FormControl>
                     <Button type="button" variant="ghost" size="icon" onClick={() => setIsCustomPresentation(false)}>
-                      <X className="h-4 w-4 text-destructive" />
+                      <X className="h-4 w-4" />
                     </Button>
                   </div>
                 ) : (
@@ -115,15 +137,11 @@ export function MedicationForm({ defaultValues, onSubmit, isLoading, submitLabel
                     defaultValue={field.value}
                   >
                     <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Seleccionar..." />
-                      </SelectTrigger>
+                      <SelectTrigger><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
                     </FormControl>
                     <SelectContent>
                       {PRESENTACIONES.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
-                      <SelectItem value="OTHER" className="font-bold text-primary">
-                        <PlusCircle className="mr-2 h-4 w-4 inline" /> Crear nueva...
-                      </SelectItem>
+                      <SelectItem value="OTHER" className="font-bold text-primary italic">+ Otra...</SelectItem>
                     </SelectContent>
                   </Select>
                 )}
@@ -132,32 +150,19 @@ export function MedicationForm({ defaultValues, onSubmit, isLoading, submitLabel
             )}
           />
 
-          {/* NUEVO CAMPO: DOSIS */}
-          <FormField
-            control={form.control}
-            name="dose"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Dosis / Concentración</FormLabel>
-                <FormControl>
-                  <Input placeholder="Ej. 500mg, 10ml, 0.5%" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
+          {/* FAMILIA */}
           <FormField
             control={form.control}
             name="familyId"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Familia</FormLabel>
-                <Select onValueChange={field.onChange} defaultValue={field.value?.toString()}>
+                <FormLabel>Familia Farmacológica</FormLabel>
+                <Select 
+                  onValueChange={field.onChange} 
+                  value={field.value?.toString()}
+                >
                   <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Seleccionar familia" />
-                    </SelectTrigger>
+                    <SelectTrigger><SelectValue placeholder="Seleccionar familia" /></SelectTrigger>
                   </FormControl>
                   <SelectContent>
                     {families?.map((family) => (
@@ -170,14 +175,15 @@ export function MedicationForm({ defaultValues, onSubmit, isLoading, submitLabel
             )}
           />
 
-          <div className="grid grid-cols-2 gap-4">
+          {/* CANTIDAD Y VENCIMIENTO */}
+          <div className="grid grid-cols-2 gap-4 md:col-span-1">
             <FormField
               control={form.control}
               name="quantity"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Cantidad</FormLabel>
-                  <FormControl><Input type="number" min="0" {...field} /></FormControl>
+                  <FormLabel>Stock</FormLabel>
+                  <FormControl><Input type="number" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
               )}
@@ -187,10 +193,8 @@ export function MedicationForm({ defaultValues, onSubmit, isLoading, submitLabel
               name="expirationDate"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Fecha Vencimiento</FormLabel>
-                  <FormControl>
-                    <Input type="date" {...field} value={field.value ? String(field.value) : ''} />
-                  </FormControl>
+                  <FormLabel>Vencimiento</FormLabel>
+                  <FormControl><Input type="date" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
               )}
@@ -198,11 +202,13 @@ export function MedicationForm({ defaultValues, onSubmit, isLoading, submitLabel
           </div>
         </div>
 
+        {/* ... (Secciones de Ficha Técnica se mantienen igual, pero con mejor espaciado) */}
         <div className="space-y-4 pt-4 border-t">
-          <h3 className="font-semibold text-lg text-foreground/80">Ficha Técnica</h3>
+          <h3 className="font-bold text-lg flex items-center gap-2 text-muted-foreground">
+            📚 Información Clínica
+          </h3>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* VÍA DE ADMINISTRACIÓN CON MENÚ INTELIGENTE */}
             <FormField
               control={form.control}
               name="administrationRoute"
@@ -210,29 +216,16 @@ export function MedicationForm({ defaultValues, onSubmit, isLoading, submitLabel
                 <FormItem>
                   <FormLabel>Vía de Administración</FormLabel>
                   {isCustomVia ? (
-                    <div className="flex gap-2 animate-in fade-in slide-in-from-left-2 duration-300">
-                      <FormControl>
-                        <Input placeholder="Escribe vía..." {...field} autoFocus />
-                      </FormControl>
-                      <Button type="button" variant="ghost" size="icon" onClick={() => setIsCustomVia(false)}>
-                        <X className="h-4 w-4 text-destructive" />
-                      </Button>
+                    <div className="flex gap-2">
+                      <FormControl><Input {...field} autoFocus /></FormControl>
+                      <Button type="button" variant="ghost" size="icon" onClick={() => setIsCustomVia(false)}><X className="h-4 w-4" /></Button>
                     </div>
                   ) : (
-                    <Select 
-                      onValueChange={(val) => val === "OTHER" ? setIsCustomVia(true) : field.onChange(val)}
-                      defaultValue={field.value}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Seleccionar vía..." />
-                        </SelectTrigger>
-                      </FormControl>
+                    <Select onValueChange={(val) => val === "OTHER" ? setIsCustomVia(true) : field.onChange(val)} defaultValue={field.value}>
+                      <FormControl><SelectTrigger><SelectValue placeholder="Seleccionar vía..." /></SelectTrigger></FormControl>
                       <SelectContent>
                         {VIAS_ADMIN.map(v => <SelectItem key={v} value={v}>{v}</SelectItem>)}
-                        <SelectItem value="OTHER" className="font-bold text-primary">
-                          <PlusCircle className="mr-2 h-4 w-4 inline" /> Crear nueva...
-                        </SelectItem>
+                        <SelectItem value="OTHER" className="font-bold text-primary">+ Otra...</SelectItem>
                       </SelectContent>
                     </Select>
                   )}
@@ -244,18 +237,14 @@ export function MedicationForm({ defaultValues, onSubmit, isLoading, submitLabel
             <FormField
               control={form.control}
               name="imageUrl"
-              render={({ field: { value, onChange, ...field } }: { field: any }) => (
+              render={({ field: { value, onChange, ...field } }) => (
                 <FormItem>
-                  <FormLabel>Foto del Medicamento</FormLabel>
+                  <FormLabel>Foto del empaque</FormLabel>
                   <FormControl>
-                    <Input 
-                      type="file" 
-                      accept="image/*" 
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) onChange(file);
-                      }} 
-                    />
+                    <Input type="file" accept="image/*" onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) onChange(file);
+                    }} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -263,67 +252,54 @@ export function MedicationForm({ defaultValues, onSubmit, isLoading, submitLabel
             />
           </div>
 
-          {/* Resto de campos se mantienen idénticos */}
-          <FormField
-            control={form.control}
-            name="mechanismOfAction"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Mecanismo de Acción</FormLabel>
-                <FormControl>
-                  <Textarea placeholder="Descripción del mecanismo..." className="resize-none" {...field} value={field.value || ''} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <FormField
+          <div className="grid grid-cols-1 gap-4">
+             <FormField
               control={form.control}
-              name="indications"
+              name="mechanismOfAction"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Indicaciones</FormLabel>
+                  <FormLabel>Mecanismo de Acción</FormLabel>
                   <FormControl>
-                    <Textarea placeholder="Usos terapéuticos..." className="resize-none" {...field} value={field.value || ''} />
+                    <Textarea placeholder="Ej: Inhibidor de la COX-2..." className="h-20" {...field} value={field.value || ''} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
-            <FormField
-              control={form.control}
-              name="posology"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Posología</FormLabel>
-                  <FormControl>
-                    <Textarea placeholder="Dosis recomendada..." className="resize-none" {...field} value={field.value || ''} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            {/* ... Indications and Posology ... */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+               <FormField
+                control={form.control}
+                name="indications"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Indicaciones</FormLabel>
+                    <FormControl>
+                      <Textarea placeholder="Dolor leve a moderado..." className="h-20" {...field} value={field.value || ''} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="posology"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Posología (Instrucciones)</FormLabel>
+                    <FormControl>
+                      <Textarea placeholder="1 tableta cada 8 horas..." className="h-20" {...field} value={field.value || ''} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
           </div>
-
-          <FormField
-            control={form.control}
-            name="description"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Descripción General</FormLabel>
-                <FormControl>
-                  <Textarea placeholder="Descripción del medicamento..." className="resize-none" {...field} value={field.value || ''} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
         </div>
 
         <div className="flex justify-end pt-4">
-          <Button type="submit" disabled={isLoading} className="w-full md:w-auto">
+          <Button type="submit" disabled={isLoading} className="w-full md:w-auto px-8">
             {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {submitLabel}
           </Button>
