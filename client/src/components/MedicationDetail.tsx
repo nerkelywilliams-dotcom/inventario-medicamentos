@@ -3,7 +3,19 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { type Medication, type Family } from "@shared/schema";
 import { ExpiryBadge, StockBadge } from "./StatusBadges";
-import { FileText, Activity, Pill, Clock, AlertTriangle, Package, Calendar, Syringe, Loader2 } from "lucide-react";
+import { 
+  FileText, 
+  Activity, 
+  Pill, 
+  Clock, 
+  AlertTriangle, 
+  Package, 
+  Calendar, 
+  Syringe, 
+  Loader2,
+  AlertOctagon, // Nuevo
+  RefreshCw      // Nuevo
+} from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { useEffect, useState } from "react";
@@ -62,6 +74,8 @@ export function MedicationDetail({
     mechanismOfAction: medication.mechanismOfAction || "No especificado",
     indications: medication.indications || "No especificadas",
     posology: medication.posology || "No especificada",
+    contraindications: medication.contraindications || "No especificadas", // Nuevo
+    interactions: medication.interactions || "No especificadas",           // Nuevo
     description: medication.description || "Sin descripción",
     imageUrl: medication.imageUrl || "",
   };
@@ -103,7 +117,6 @@ export function MedicationDetail({
                     <span className="text-sm opacity-90 bg-white/10 px-3 py-1 rounded-full">
                       {safeMedication.presentation}
                     </span>
-                    {/* NUEVO: Dosis en la cabecera */}
                     <Badge className="bg-white text-primary hover:bg-white font-bold border-0 shadow-sm">
                       Dosis: {safeMedication.dose}
                     </Badge>
@@ -126,7 +139,7 @@ export function MedicationDetail({
                 </div>
                 
                 {safeMedication.imageUrl && (
-                  <div className="h-24 w-24 rounded-xl bg-white p-2 shrink-0 overflow-hidden shadow-lg">
+                  <div className="h-24 w-24 rounded-xl bg-white p-2 shrink-0 overflow-hidden shadow-lg border border-white/20">
                     <img 
                       src={safeMedication.imageUrl} 
                       alt={safeMedication.name} 
@@ -157,7 +170,6 @@ export function MedicationDetail({
                     </div>
                   </div>
                   
-                  {/* NUEVO: Cuadro Central de Dosis */}
                   <div className="flex items-center gap-4 bg-primary/10 p-4 rounded-xl border border-primary/20 shadow-sm">
                     <div className="bg-primary p-3 rounded-full text-white">
                       <Activity className="h-6 w-6" />
@@ -181,22 +193,8 @@ export function MedicationDetail({
                   </div>
                 </div>
 
-                {safeMedication.imageUrl && (
-                  <div className="relative w-full overflow-hidden rounded-2xl border bg-muted/20 p-4">
-                    <div className="flex flex-col items-center justify-center">
-                      <h3 className="text-lg font-semibold mb-4 text-center">Imagen del Producto</h3>
-                      <div className="relative h-64 w-64 md:h-80 md:w-80 overflow-hidden rounded-xl border-2 border-primary/20 bg-white">
-                        <img 
-                          src={safeMedication.imageUrl} 
-                          alt={`Imagen de ${safeMedication.name}`}
-                          className="h-full w-full object-contain p-4"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {safeMedication.description && (
+                {/* Sección de Descripción */}
+                {safeMedication.description && safeMedication.description !== "Sin descripción" && (
                   <section className="space-y-3">
                     <h3 className="font-semibold text-xl flex items-center gap-2 text-primary">
                       <FileText className="h-5 w-5" />
@@ -208,8 +206,9 @@ export function MedicationDetail({
                   </section>
                 )}
 
+                {/* Ficha Técnica: Mecanismo, Posología, Indicaciones */}
                 <div className="space-y-6">
-                  <h3 className="font-semibold text-2xl border-b pb-2">Ficha Técnica Completa</h3>
+                  <h3 className="font-semibold text-2xl border-b pb-2">Información Clínica</h3>
                   <div className="grid md:grid-cols-2 gap-8">
                     <div className="space-y-6">
                       <section className="space-y-3">
@@ -254,35 +253,71 @@ export function MedicationDetail({
                   </div>
                 </div>
 
-                {/* Footer con información resumida */}
-                <div className="pt-6 border-t">
-                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 text-sm">
+                {/* NUEVO: SECCIÓN DE SEGURIDAD Y ALERTAS (CRÍTICO) */}
+                <div className="space-y-6 pt-6 border-t">
+                  <h3 className="font-semibold text-2xl text-destructive flex items-center gap-2">
+                    <AlertOctagon className="h-6 w-6" />
+                    Seguridad del Paciente
+                  </h3>
+                  <div className="grid md:grid-cols-2 gap-8">
+                    <section className="space-y-3">
+                      <div className="flex items-center gap-2 text-destructive font-bold">
+                        <AlertOctagon className="h-5 w-5" />
+                        <h4 className="text-lg">Contraindicaciones</h4>
+                      </div>
+                      <div className="p-4 bg-destructive/5 rounded-xl border border-destructive/10 min-h-[100px]">
+                        <p className="text-foreground leading-relaxed italic">
+                          {safeMedication.contraindications}
+                        </p>
+                      </div>
+                    </section>
+
+                    <section className="space-y-3">
+                      <div className="flex items-center gap-2 text-amber-600 font-bold">
+                        <RefreshCw className="h-5 w-5" />
+                        <h4 className="text-lg">Interacciones</h4>
+                      </div>
+                      <div className="p-4 bg-amber-50/50 rounded-xl border border-amber-100 min-h-[100px]">
+                        <p className="text-foreground leading-relaxed">
+                          {safeMedication.interactions}
+                        </p>
+                      </div>
+                    </section>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground text-center italic mt-4">
+                    * Esta información es de carácter referencial. Verifique siempre con el prospecto oficial del fármaco.
+                  </p>
+                </div>
+
+                {/* Footer Resumen */}
+                <div className="pt-6 border-t pb-4">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
                     <div className="flex items-center gap-2 p-3 bg-muted/10 rounded-lg">
                       <Activity className="h-4 w-4 text-primary" />
                       <div>
                         <p className="font-medium text-[11px] uppercase opacity-70">Dosis</p>
-                        <p className="font-semibold">{safeMedication.dose}</p>
+                        <p className="font-semibold truncate">{safeMedication.dose}</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-2 p-3 bg-muted/10 rounded-lg">
                       <Package className="h-4 w-4 text-muted-foreground" />
                       <div>
-                        <p className="font-medium text-[11px] uppercase opacity-70">Presentación</p>
-                        <p className="text-muted-foreground">{safeMedication.presentation}</p>
+                        <p className="font-medium text-[11px] uppercase opacity-70">Tipo</p>
+                        <p className="text-muted-foreground truncate">{safeMedication.presentation}</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-2 p-3 bg-muted/10 rounded-lg">
                       <Calendar className="h-4 w-4 text-muted-foreground" />
                       <div>
-                        <p className="font-medium text-[11px] uppercase opacity-70">Vencimiento</p>
-                        <p className="text-muted-foreground">{formatExpiryDate(safeMedication.expirationDate)}</p>
+                        <p className="font-medium text-[11px] uppercase opacity-70">Vence</p>
+                        <p className="text-muted-foreground">{new Date(safeMedication.expirationDate).toLocaleDateString()}</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-2 p-3 bg-muted/10 rounded-lg">
                       <Syringe className="h-4 w-4 text-muted-foreground" />
                       <div>
                         <p className="font-medium text-[11px] uppercase opacity-70">Vía</p>
-                        <p className="text-muted-foreground">{safeMedication.administrationRoute}</p>
+                        <p className="text-muted-foreground truncate">{safeMedication.administrationRoute}</p>
                       </div>
                     </div>
                   </div>
