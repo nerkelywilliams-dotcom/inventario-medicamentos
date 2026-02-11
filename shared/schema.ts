@@ -7,7 +7,7 @@ export const families = pgTable("families", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   description: text("description"),
-  inventoryLocation: text("inventory_location").notNull().default("maracay"), // "maracay" o "magdaleno"
+  inventoryLocation: text("inventory_location").notNull().default("maracay"),
 });
 
 export const medications = pgTable("medications", {
@@ -16,6 +16,8 @@ export const medications = pgTable("medications", {
   name: text("name").notNull(),
   description: text("description"), 
   presentation: text("presentation").notNull(),
+  // CORRECCIÓN: Se agrega un default para evitar el error de "not-null" con datos existentes
+  dose: text("dose").notNull().default("Ver empaque"), 
   quantity: integer("quantity").notNull().default(0),
   expirationDate: timestamp("expiration_date").notNull(),
   imageUrl: text("image_url"),
@@ -23,7 +25,7 @@ export const medications = pgTable("medications", {
   indications: text("indications"),
   posology: text("posology"),
   administrationRoute: text("administration_route"),
-  inventoryLocation: text("inventory_location").notNull().default("maracay"), // "maracay" o "magdaleno"
+  inventoryLocation: text("inventory_location").notNull().default("maracay"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -45,19 +47,19 @@ export type Family = typeof families.$inferSelect;
 export type InsertFamily = z.infer<typeof insertFamilySchema>;
 export type Medication = typeof medications.$inferSelect;
 export type InsertMedication = z.infer<typeof insertMedicationSchema>;
+
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   username: text("username").notNull().unique(),
   password: text("password").notNull(),
-  role: text("role").notNull().default("viewer"), // "admin" o "viewer"
-  inventoryLocation: text("inventory_location").notNull().default("maracay"), // "maracay" o "magdaleno"
+  role: text("role").notNull().default("viewer"),
+  inventoryLocation: text("inventory_location").notNull().default("maracay"),
 });
 
 export const insertUserSchema = createInsertSchema(users).omit({ id: true });
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
 
-// Schemas adicionales para autenticación
 export const loginSchema = z.object({
   username: z.string().min(1, 'El usuario es requerido'),
   password: z.string().min(1, 'La contraseña es requerida'),

@@ -42,6 +42,7 @@ export default function Inventory() {
 
     const data = medications.map(m => ({
       Nombre: m.name,
+      Dosis: m.dose, // <-- Incluido en el Excel
       Familia: m.family?.name || "N/A",
       Presentacion: m.presentation,
       Cantidad: m.quantity,
@@ -135,7 +136,7 @@ export default function Inventory() {
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/30 hover:bg-muted/30">
-              <TableHead>Nombre / Presentación</TableHead>
+              <TableHead>Medicamento / Dosis</TableHead>
               <TableHead className="hidden md:table-cell">Familia</TableHead>
               <TableHead>Estado Stock</TableHead>
               <TableHead>Vencimiento</TableHead>
@@ -164,10 +165,11 @@ export default function Inventory() {
                 <TableRow key={med.id} className="group hover:bg-muted/20 transition-colors">
                   <TableCell>
                     <div>
-                      <div className="font-semibold text-foreground group-hover:text-primary transition-colors">
-                        {med.name}
+                      <div className="font-semibold text-foreground group-hover:text-primary transition-colors flex items-center gap-1">
+                        {med.name} 
+                        <span className="text-muted-foreground font-normal">({med.dose})</span>
                       </div>
-                      <div className="text-xs text-muted-foreground">{med.presentation}</div>
+                      <div className="text-xs text-muted-foreground italic">{med.presentation}</div>
                     </div>
                   </TableCell>
                   <TableCell className="hidden md:table-cell">

@@ -13,7 +13,6 @@ interface MedicationDetailProps {
   trigger?: React.ReactNode;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
-  // Nueva prop opcional para recargar datos si están incompletos
   fetchFullData?: (id: number) => Promise<Medication & { family?: Family }>;
 }
 
@@ -28,12 +27,11 @@ export function MedicationDetail({
   const [isLoading, setIsLoading] = useState(false);
   const [hasLoadedFullData, setHasLoadedFullData] = useState(false);
 
-  // Cuando se abre el diálogo, verificar si necesitamos cargar datos completos
   useEffect(() => {
     if (open && fetchFullData && !hasLoadedFullData) {
       const needsFullData = !initialMedication.administrationRoute || 
-                           !initialMedication.mechanismOfAction || 
-                           !initialMedication.indications;
+                            !initialMedication.mechanismOfAction || 
+                            !initialMedication.indications;
       
       if (needsFullData) {
         setIsLoading(true);
@@ -52,15 +50,14 @@ export function MedicationDetail({
     }
   }, [open, fetchFullData, hasLoadedFullData, initialMedication]);
 
-  // Reset cuando cambia el medicamento inicial
   useEffect(() => {
     setMedication(initialMedication);
     setHasLoadedFullData(false);
   }, [initialMedication]);
 
-  // Asegurar que todos los campos tengan valores por defecto si son undefined/null
   const safeMedication = {
     ...medication,
+    dose: medication.dose || "No especificada",
     administrationRoute: medication.administrationRoute || "No especificada",
     mechanismOfAction: medication.mechanismOfAction || "No especificado",
     indications: medication.indications || "No especificadas",
@@ -69,7 +66,6 @@ export function MedicationDetail({
     imageUrl: medication.imageUrl || "",
   };
 
-  // Formatear fecha de vencimiento
   const formatExpiryDate = (date: Date | string) => {
     try {
       return new Date(date).toLocaleDateString('es-ES', {
@@ -107,6 +103,10 @@ export function MedicationDetail({
                     <span className="text-sm opacity-90 bg-white/10 px-3 py-1 rounded-full">
                       {safeMedication.presentation}
                     </span>
+                    {/* NUEVO: Dosis en la cabecera */}
+                    <Badge className="bg-white text-primary hover:bg-white font-bold border-0 shadow-sm">
+                      Dosis: {safeMedication.dose}
+                    </Badge>
                   </div>
                   <h2 className="text-3xl font-bold tracking-tight mb-2">{safeMedication.name}</h2>
                   <div className="flex flex-wrap items-center gap-4 text-sm opacity-90">
@@ -142,14 +142,14 @@ export function MedicationDetail({
 
             <ScrollArea className="max-h-[calc(90vh-180px)]">
               <div className="p-8 space-y-8">
-                {/* Estado del inventario */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 p-6 bg-gradient-to-br from-muted/20 to-muted/5 rounded-2xl border border-border/30">
+                {/* Grid de Estado con Dosis Resaltada */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 p-6 bg-gradient-to-br from-muted/20 to-muted/5 rounded-2xl border border-border/30">
                   <div className="flex items-center gap-4">
                     <div className="bg-blue-100 p-3 rounded-full text-blue-600">
                       <Pill className="h-6 w-6" />
                     </div>
                     <div>
-                      <p className="text-sm text-muted-foreground font-medium uppercase tracking-wider">Inventario Actual</p>
+                      <p className="text-sm text-muted-foreground font-medium uppercase tracking-wider">Inventario</p>
                       <div className="flex items-center gap-2 mt-1">
                         <StockBadge quantity={safeMedication.quantity} />
                         <span className="text-lg font-semibold">{safeMedication.quantity} unidades</span>
@@ -157,12 +157,23 @@ export function MedicationDetail({
                     </div>
                   </div>
                   
+                  {/* NUEVO: Cuadro Central de Dosis */}
+                  <div className="flex items-center gap-4 bg-primary/10 p-4 rounded-xl border border-primary/20 shadow-sm">
+                    <div className="bg-primary p-3 rounded-full text-white">
+                      <Activity className="h-6 w-6" />
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-primary font-bold uppercase tracking-widest leading-none mb-1">Dosis Recomendada</p>
+                      <p className="text-xl font-black text-primary leading-tight">{safeMedication.dose}</p>
+                    </div>
+                  </div>
+
                   <div className="flex items-center gap-4">
                     <div className="bg-amber-100 p-3 rounded-full text-amber-600">
                       <Clock className="h-6 w-6" />
                     </div>
                     <div>
-                      <p className="text-sm text-muted-foreground font-medium uppercase tracking-wider">Estado de Vencimiento</p>
+                      <p className="text-sm text-muted-foreground font-medium uppercase tracking-wider">Vencimiento</p>
                       <div className="mt-1">
                         <ExpiryBadge date={safeMedication.expirationDate} />
                       </div>
@@ -170,7 +181,6 @@ export function MedicationDetail({
                   </div>
                 </div>
 
-                {/* Imagen principal si existe */}
                 {safeMedication.imageUrl && (
                   <div className="relative w-full overflow-hidden rounded-2xl border bg-muted/20 p-4">
                     <div className="flex flex-col items-center justify-center">
@@ -180,19 +190,12 @@ export function MedicationDetail({
                           src={safeMedication.imageUrl} 
                           alt={`Imagen de ${safeMedication.name}`}
                           className="h-full w-full object-contain p-4"
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).src = "/placeholder-medication.png";
-                          }}
                         />
                       </div>
-                      <p className="text-sm text-muted-foreground mt-4 text-center">
-                        {safeMedication.name} - {safeMedication.presentation}
-                      </p>
                     </div>
                   </div>
                 )}
 
-                {/* Descripción general */}
                 {safeMedication.description && (
                   <section className="space-y-3">
                     <h3 className="font-semibold text-xl flex items-center gap-2 text-primary">
@@ -200,19 +203,14 @@ export function MedicationDetail({
                       Descripción General
                     </h3>
                     <div className="p-4 bg-muted/10 rounded-lg border">
-                      <p className="text-foreground leading-relaxed">
-                        {safeMedication.description}
-                      </p>
+                      <p className="text-foreground leading-relaxed">{safeMedication.description}</p>
                     </div>
                   </section>
                 )}
 
-                {/* Ficha Técnica - Grid de 2 columnas */}
                 <div className="space-y-6">
                   <h3 className="font-semibold text-2xl border-b pb-2">Ficha Técnica Completa</h3>
-                  
                   <div className="grid md:grid-cols-2 gap-8">
-                    {/* Columna 1 */}
                     <div className="space-y-6">
                       <section className="space-y-3">
                         <div className="flex items-center gap-2 text-primary">
@@ -220,26 +218,19 @@ export function MedicationDetail({
                           <h4 className="font-semibold text-lg">Mecanismo de Acción</h4>
                         </div>
                         <div className="p-4 bg-muted/10 rounded-lg border">
-                          <p className="text-foreground leading-relaxed">
-                            {safeMedication.mechanismOfAction}
-                          </p>
+                          <p className="text-foreground leading-relaxed">{safeMedication.mechanismOfAction}</p>
                         </div>
                       </section>
-
                       <section className="space-y-3">
                         <div className="flex items-center gap-2 text-primary">
                           <FileText className="h-5 w-5" />
                           <h4 className="font-semibold text-lg">Posología</h4>
                         </div>
                         <div className="p-4 bg-muted/10 rounded-lg border">
-                          <p className="text-foreground leading-relaxed">
-                            {safeMedication.posology}
-                          </p>
+                          <p className="text-foreground leading-relaxed">{safeMedication.posology}</p>
                         </div>
                       </section>
                     </div>
-
-                    {/* Columna 2 */}
                     <div className="space-y-6">
                       <section className="space-y-3">
                         <div className="flex items-center gap-2 text-primary">
@@ -247,50 +238,50 @@ export function MedicationDetail({
                           <h4 className="font-semibold text-lg">Indicaciones</h4>
                         </div>
                         <div className="p-4 bg-muted/10 rounded-lg border">
-                          <p className="text-foreground leading-relaxed">
-                            {safeMedication.indications}
-                          </p>
+                          <p className="text-foreground leading-relaxed">{safeMedication.indications}</p>
                         </div>
                       </section>
-
                       <section className="space-y-3">
                         <div className="flex items-center gap-2 text-primary">
                           <Pill className="h-5 w-5" />
                           <h4 className="font-semibold text-lg">Vía de Administración</h4>
                         </div>
                         <div className="p-4 bg-muted/10 rounded-lg border">
-                          <p className="text-foreground leading-relaxed">
-                            {safeMedication.administrationRoute}
-                          </p>
+                          <p className="text-foreground leading-relaxed">{safeMedication.administrationRoute}</p>
                         </div>
                       </section>
                     </div>
                   </div>
                 </div>
 
-                {/* Información adicional */}
+                {/* Footer con información resumida */}
                 <div className="pt-6 border-t">
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
+                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 text-sm">
+                    <div className="flex items-center gap-2 p-3 bg-muted/10 rounded-lg">
+                      <Activity className="h-4 w-4 text-primary" />
+                      <div>
+                        <p className="font-medium text-[11px] uppercase opacity-70">Dosis</p>
+                        <p className="font-semibold">{safeMedication.dose}</p>
+                      </div>
+                    </div>
                     <div className="flex items-center gap-2 p-3 bg-muted/10 rounded-lg">
                       <Package className="h-4 w-4 text-muted-foreground" />
                       <div>
-                        <p className="font-medium">Presentación</p>
+                        <p className="font-medium text-[11px] uppercase opacity-70">Presentación</p>
                         <p className="text-muted-foreground">{safeMedication.presentation}</p>
                       </div>
                     </div>
-                    
                     <div className="flex items-center gap-2 p-3 bg-muted/10 rounded-lg">
                       <Calendar className="h-4 w-4 text-muted-foreground" />
                       <div>
-                        <p className="font-medium">Fecha de Vencimiento</p>
+                        <p className="font-medium text-[11px] uppercase opacity-70">Vencimiento</p>
                         <p className="text-muted-foreground">{formatExpiryDate(safeMedication.expirationDate)}</p>
                       </div>
                     </div>
-                    
                     <div className="flex items-center gap-2 p-3 bg-muted/10 rounded-lg">
                       <Syringe className="h-4 w-4 text-muted-foreground" />
                       <div>
-                        <p className="font-medium">Vía de Administración</p>
+                        <p className="font-medium text-[11px] uppercase opacity-70">Vía</p>
                         <p className="text-muted-foreground">{safeMedication.administrationRoute}</p>
                       </div>
                     </div>
