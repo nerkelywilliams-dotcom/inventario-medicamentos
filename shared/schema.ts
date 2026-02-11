@@ -16,7 +16,6 @@ export const medications = pgTable("medications", {
   name: text("name").notNull(),
   description: text("description"), 
   presentation: text("presentation").notNull(),
-  // CORRECCIÓN: Se agrega un default para evitar el error de "not-null" con datos existentes
   dose: text("dose").notNull().default("Ver empaque"), 
   quantity: integer("quantity").notNull().default(0),
   expirationDate: timestamp("expiration_date").notNull(),
@@ -25,6 +24,9 @@ export const medications = pgTable("medications", {
   indications: text("indications"),
   posology: text("posology"),
   administrationRoute: text("administration_route"),
+  // NUEVOS CAMPOS: Ficha Farmacológica Extendida
+  contraindications: text("contraindications").notNull().default("No especificadas"),
+  interactions: text("interactions").notNull().default("No especificadas"),
   inventoryLocation: text("inventory_location").notNull().default("maracay"),
   createdAt: timestamp("created_at").defaultNow(),
 });
