@@ -7,8 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
-import { Loader2, PlusCircle, X, Pill, Activity } from "lucide-react";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Loader2, PlusCircle, X, Pill, Activity, AlertOctagon, RefreshCw } from "lucide-react";
 import { z } from "zod";
 
 interface MedicationFormProps {
@@ -50,8 +50,9 @@ export function MedicationForm({ defaultValues, onSubmit, isLoading, submitLabel
       indications: "",
       posology: "",
       administrationRoute: "",
+      contraindications: "", // Nuevo
+      interactions: "",      // Nuevo
       ...defaultValues,
-      // Manejo de fecha para el input type="date"
       expirationDate: defaultValues?.expirationDate 
         ? new Date(defaultValues.expirationDate).toISOString().split('T')[0]
         : "",
@@ -59,7 +60,6 @@ export function MedicationForm({ defaultValues, onSubmit, isLoading, submitLabel
   });
 
   const handleSubmit = (data: any) => {
-    // Convertimos la fecha de string a Date antes de enviar
     const formattedData = {
       ...data,
       expirationDate: new Date(data.expirationDate)
@@ -80,8 +80,8 @@ export function MedicationForm({ defaultValues, onSubmit, isLoading, submitLabel
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
+        {/* SECCIÓN 1: DATOS BÁSICOS */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* Nombre Comercial - Más ancho */}
           <FormField
             control={form.control}
             name="name"
@@ -98,7 +98,6 @@ export function MedicationForm({ defaultValues, onSubmit, isLoading, submitLabel
             )}
           />
 
-          {/* DOSIS / CONCENTRACIÓN - Resaltada al lado del nombre */}
           <FormField
             control={form.control}
             name="dose"
@@ -115,7 +114,6 @@ export function MedicationForm({ defaultValues, onSubmit, isLoading, submitLabel
             )}
           />
 
-          {/* PRESENTACIÓN */}
           <FormField
             control={form.control}
             name="presentation"
@@ -124,24 +122,15 @@ export function MedicationForm({ defaultValues, onSubmit, isLoading, submitLabel
                 <FormLabel>Presentación</FormLabel>
                 {isCustomPresentation ? (
                   <div className="flex gap-2">
-                    <FormControl>
-                      <Input placeholder="Escribe..." {...field} autoFocus />
-                    </FormControl>
-                    <Button type="button" variant="ghost" size="icon" onClick={() => setIsCustomPresentation(false)}>
-                      <X className="h-4 w-4" />
-                    </Button>
+                    <FormControl><Input {...field} autoFocus /></FormControl>
+                    <Button type="button" variant="ghost" size="icon" onClick={() => setIsCustomPresentation(false)}><X className="h-4 w-4" /></Button>
                   </div>
                 ) : (
-                  <Select 
-                    onValueChange={(val) => val === "OTHER" ? setIsCustomPresentation(true) : field.onChange(val)}
-                    defaultValue={field.value}
-                  >
-                    <FormControl>
-                      <SelectTrigger><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
-                    </FormControl>
+                  <Select onValueChange={(val) => val === "OTHER" ? setIsCustomPresentation(true) : field.onChange(val)} defaultValue={field.value}>
+                    <FormControl><SelectTrigger><SelectValue placeholder="Seleccionar..." /></SelectTrigger></FormControl>
                     <SelectContent>
                       {PRESENTACIONES.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
-                      <SelectItem value="OTHER" className="font-bold text-primary italic">+ Otra...</SelectItem>
+                      <SelectItem value="OTHER" className="font-bold text-primary">+ Otra...</SelectItem>
                     </SelectContent>
                   </Select>
                 )}
@@ -150,20 +139,14 @@ export function MedicationForm({ defaultValues, onSubmit, isLoading, submitLabel
             )}
           />
 
-          {/* FAMILIA */}
           <FormField
             control={form.control}
             name="familyId"
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Familia Farmacológica</FormLabel>
-                <Select 
-                  onValueChange={field.onChange} 
-                  value={field.value?.toString()}
-                >
-                  <FormControl>
-                    <SelectTrigger><SelectValue placeholder="Seleccionar familia" /></SelectTrigger>
-                  </FormControl>
+                <Select onValueChange={field.onChange} value={field.value?.toString()}>
+                  <FormControl><SelectTrigger><SelectValue placeholder="Seleccionar familia" /></SelectTrigger></FormControl>
                   <SelectContent>
                     {families?.map((family) => (
                       <SelectItem key={family.id} value={family.id.toString()}>{family.name}</SelectItem>
@@ -175,7 +158,6 @@ export function MedicationForm({ defaultValues, onSubmit, isLoading, submitLabel
             )}
           />
 
-          {/* CANTIDAD Y VENCIMIENTO */}
           <div className="grid grid-cols-2 gap-4 md:col-span-1">
             <FormField
               control={form.control}
@@ -202,10 +184,10 @@ export function MedicationForm({ defaultValues, onSubmit, isLoading, submitLabel
           </div>
         </div>
 
-        {/* ... (Secciones de Ficha Técnica se mantienen igual, pero con mejor espaciado) */}
+        {/* SECCIÓN 2: FICHA TÉCNICA CLÍNICA */}
         <div className="space-y-4 pt-4 border-t">
           <h3 className="font-bold text-lg flex items-center gap-2 text-muted-foreground">
-            📚 Información Clínica
+            📚 Ficha Farmacológica
           </h3>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -252,30 +234,30 @@ export function MedicationForm({ defaultValues, onSubmit, isLoading, submitLabel
             />
           </div>
 
-          <div className="grid grid-cols-1 gap-4">
-             <FormField
+          <div className="space-y-4">
+            <FormField
               control={form.control}
               name="mechanismOfAction"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Mecanismo de Acción</FormLabel>
                   <FormControl>
-                    <Textarea placeholder="Ej: Inhibidor de la COX-2..." className="h-20" {...field} value={field.value || ''} />
+                    <Textarea placeholder="Ej: Inhibidor reversible de la ciclooxigenasa..." className="h-20" {...field} value={field.value || ''} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
-            {/* ... Indications and Posology ... */}
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-               <FormField
+              <FormField
                 control={form.control}
                 name="indications"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Indicaciones</FormLabel>
                     <FormControl>
-                      <Textarea placeholder="Dolor leve a moderado..." className="h-20" {...field} value={field.value || ''} />
+                      <Textarea placeholder="Dolor, fiebre, inflamación..." className="h-20" {...field} value={field.value || ''} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -286,15 +268,73 @@ export function MedicationForm({ defaultValues, onSubmit, isLoading, submitLabel
                 name="posology"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Posología (Instrucciones)</FormLabel>
+                    <FormLabel>Posología</FormLabel>
                     <FormControl>
-                      <Textarea placeholder="1 tableta cada 8 horas..." className="h-20" {...field} value={field.value || ''} />
+                      <Textarea placeholder="Adultos: 1 tableta cada 8 horas..." className="h-20" {...field} value={field.value || ''} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
             </div>
+
+            {/* NUEVOS CAMPOS: SEGURIDAD DEL PACIENTE */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="contraindications"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="flex items-center gap-2 text-destructive font-bold">
+                      <AlertOctagon className="h-4 w-4" /> Contraindicaciones
+                    </FormLabel>
+                    <FormControl>
+                      <Textarea 
+                        placeholder="Ej: Hipersensibilidad, úlcera péptica activa, 3er trimestre de embarazo..." 
+                        className="h-24 border-destructive/20 focus-visible:ring-destructive" 
+                        {...field} 
+                        value={field.value || ''} 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="interactions"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="flex items-center gap-2 text-amber-600 font-bold">
+                      <RefreshCw className="h-4 w-4" /> Interacciones
+                    </FormLabel>
+                    <FormControl>
+                      <Textarea 
+                        placeholder="Ej: Anticoagulantes, litio, otros AINEs..." 
+                        className="h-24 border-amber-200 focus-visible:ring-amber-500" 
+                        {...field} 
+                        value={field.value || ''} 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <FormField
+              control={form.control}
+              name="description"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Descripción Adicional</FormLabel>
+                  <FormControl>
+                    <Textarea placeholder="Notas adicionales sobre el medicamento..." className="h-20" {...field} value={field.value || ''} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
           </div>
         </div>
 
