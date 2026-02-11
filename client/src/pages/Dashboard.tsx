@@ -1,7 +1,8 @@
 import { useMedications } from "@/hooks/use-medications";
-import { Pill, AlertCircle, AlertTriangle, Clock } from "lucide-react";
+import { Pill, AlertCircle, AlertTriangle, Clock, ArrowDownLeft, ArrowUpRight, FileEdit, History } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
-import { differenceInDays, isAfter } from "date-fns";
+import { differenceInDays, isAfter, format } from "date-fns";
+import { es } from "date-fns/locale"; // Asegúrate de tener esto, si no usa 'en-US' o elimina el locale
 
 export default function Dashboard() {
   const { data: medications } = useMedications();
@@ -23,6 +24,15 @@ export default function Dashboard() {
     { name: 'Agotado', value: expired, color: '#dc2626' },
   ];
 
+  // SIMULACIÓN DE DATOS DE AUDITORÍA (Esto vendrá de tu API filtrado por ID de Inventario)
+  // En el futuro: const { data: activities } = useQuery(['/api/activities'])
+  const recentActivity = [
+    { id: 1, type: 'IN', product: 'Amoxicilina 500mg', quantity: 50, user: 'Admin', date: new Date() },
+    { id: 2, type: 'OUT', product: 'Losartán 50mg', quantity: 12, user: 'Dr. Pérez', date: new Date(Date.now() - 3600000) },
+    { id: 3, type: 'UPDATE', product: 'Ibuprofeno', detail: 'Corrección de stock', user: 'Admin', date: new Date(Date.now() - 7200000) },
+    { id: 4, type: 'OUT', product: 'Guantes Quirúrgicos', quantity: 100, user: 'Enfermería', date: new Date(Date.now() - 86400000) },
+  ];
+
   return (
     <div className="p-10 bg-white min-h-screen space-y-10">
       <div className="flex flex-col gap-1">
@@ -30,13 +40,11 @@ export default function Dashboard() {
         <p className="text-slate-400 font-bold italic">Sede Magdaleno • Gestión de Inventario Farmacéutico</p>
       </div>
 
-      {/* TARJETAS DE ESTADÍSTICAS CON ANIMACIÓN DE CURSOR */}
+      {/* TARJETAS DE ESTADÍSTICAS */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
         {stats.map((stat) => (
           <div 
             key={stat.title} 
-            // 1. Agregamos 'group' aquí para que el hijo detecte el hover del padre
-            // 2. Agregamos una pequeña transición a la tarjeta completa
             className={`${stat.color} text-white p-10 rounded-[2.5rem] relative overflow-hidden shadow-2xl shadow-slate-200 h-52 flex flex-col justify-center group transition-all duration-300 hover:scale-[1.02] cursor-default`}
           >
             <div className="relative z-10">
@@ -44,8 +52,6 @@ export default function Dashboard() {
               <h3 className="text-7xl font-black mb-1 leading-none">{stat.value}</h3>
               <p className="text-[9px] font-bold opacity-70 uppercase tracking-widest">Registrados en sistema</p>
             </div>
-            
-            {/* 3. Agregamos las clases 'group-hover' para animar el icono */}
             <stat.icon 
                 className="absolute right-[-15px] bottom-[-15px] h-36 w-36 opacity-10 rotate-12 transition-transform duration-500 ease-out group-hover:scale-125 group-hover:-translate-x-4 group-hover:-translate-y-4 group-hover:rotate-[24deg]" 
             />
@@ -54,7 +60,7 @@ export default function Dashboard() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
-        {/* GRÁFICO */}
+        {/* GRÁFICO CIRCULAR */}
         <div className="bg-[#fcfdfe] rounded-[3.5rem] p-12 border border-slate-50 shadow-sm">
           <div className="flex items-center gap-4 mb-10">
             <div className="h-2 w-12 bg-[#2b4cc4] rounded-full" />
@@ -108,6 +114,67 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+
+      {/* --- NUEVA SECCIÓN: HISTORIAL DE MOVIMIENTOS --- */}
+      <div className="bg-white rounded-[3.5rem] p-12 border border-slate-100 shadow-lg shadow-slate-200/50">
+        <div className="flex items-center justify-between mb-8">
+            <div className="flex items-center gap-3">
+                <div className="p-3 bg-slate-100 rounded-2xl">
+                    <History className="text-[#1a2b4b] w-6 h-6" />
+                </div>
+                <div>
+                    <h3 className="text-2xl font-black text-[#1a2b4b]">Bitácora de Movimientos</h3>
+                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Últimos cambios registrados</p>
+                </div>
+            </div>
+            <button className="text-sm font-bold text-[#2b4cc4] hover:underline">Ver todo</button>
+        </div>
+
+        <div className="overflow-x-auto">
+            <table className="w-full">
+                <thead>
+                    <tr className="border-b border-slate-100 text-left">
+                        <th className="pb-4 pl-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Tipo</th>
+                        <th className="pb-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Detalle</th>
+                        <th className="pb-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Responsable</th>
+                        <th className="pb-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right pr-4">Fecha</th>
+                    </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                    {recentActivity.map((activity) => (
+                        <tr key={activity.id} className="group hover:bg-slate-50 transition-colors">
+                            <td className="py-4 pl-4">
+                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center 
+                                    ${activity.type === 'IN' ? 'bg-emerald-100 text-emerald-600' : 
+                                      activity.type === 'OUT' ? 'bg-rose-100 text-rose-600' : 'bg-amber-100 text-amber-600'}`}>
+                                    {activity.type === 'IN' && <ArrowDownLeft size={20} />}
+                                    {activity.type === 'OUT' && <ArrowUpRight size={20} />}
+                                    {activity.type === 'UPDATE' && <FileEdit size={20} />}
+                                </div>
+                            </td>
+                            <td className="py-4">
+                                <p className="font-bold text-[#1a2b4b] text-sm">{activity.product}</p>
+                                <p className="text-xs font-medium text-slate-500">
+                                    {activity.type === 'UPDATE' ? activity.detail : 
+                                     activity.type === 'IN' ? `Ingreso de ${activity.quantity} uds` : `Despacho de ${activity.quantity} uds`}
+                                </p>
+                            </td>
+                            <td className="py-4">
+                                <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 text-xs font-bold">
+                                    {activity.user}
+                                </span>
+                            </td>
+                            <td className="py-4 text-right pr-4">
+                                <p className="text-sm font-bold text-slate-600">{format(activity.date, 'dd MMM', { locale: es })}</p>
+                                <p className="text-[10px] font-medium text-slate-400">{format(activity.date, 'HH:mm')}</p>
+                            </td>
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
+        </div>
+      </div>
+
     </div>
   );
 }
