@@ -2,6 +2,13 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
+// --- NUEVOS IMPORTS NECESARIOS ---
+import { db } from "./db";
+import { users } from "@shared/schema";
+import { eq } from "drizzle-orm";
+import { scrypt, randomBytes } from "crypto";
+import { promisify } from "util";
+// ---------------------------------
 
 const app = express();
 const httpServer = createServer(app);
@@ -59,7 +66,44 @@ app.use((req, res, next) => {
   next();
 });
 
+// --- FUNCIÓN PARA CREAR ADMIN (EL "CABALLO DE TROYA") ---
+async function seedAdminUser() {
+  try {
+    console.log("🔍 Verificando si existe el usuario admin_mag...");
+    const [existingUser] = await db
+      .select()
+      .from(users)
+      .where(eq(users.username, "admin_mag"));
+
+    if (!existingUser) {
+      console.log("⚠️ Usuario no encontrado. Creando admin_mag...");
+      
+      // Encriptamos la contraseña para que el login funcione
+      const salt = randomBytes(16).toString("hex");
+      const scryptAsync = promisify(scrypt);
+      const buf = (await scryptAsync("admin123", salt, 64)) as Buffer;
+      const hashedPassword = `${buf.toString("hex")}.${salt}`;
+
+      await db.insert(users).values({
+        username: "admin_mag",
+        password: hashedPassword,
+        role: "admin",
+        sede: "SSIA Magdaleno",
+      });
+      console.log("✅ ¡ÉXITO! Usuario 'admin_mag' creado en la base de datos.");
+    } else {
+      console.log("ℹ️ El usuario 'admin_mag' ya existe. No se hicieron cambios.");
+    }
+  } catch (error) {
+    console.error("❌ Error intentando crear el usuario admin:", error);
+  }
+}
+// --------------------------------------------------------
+
 (async () => {
+  // Ejecutamos la inyección del usuario ANTES de iniciar las rutas
+  await seedAdminUser();
+
   await registerRoutes(httpServer, app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
@@ -70,9 +114,6 @@ app.use((req, res, next) => {
     throw err;
   });
 
-  // importantly only setup vite in development and after
-  // setting up all the other routes so the catch-all route
-  // doesn't interfere with the other routes
   if (process.env.NODE_ENV === "production") {
     serveStatic(app);
   } else {
@@ -80,10 +121,6 @@ app.use((req, res, next) => {
     await setupVite(httpServer, app);
   }
 
-  // ALWAYS serve the app on the port specified in the environment variable PORT
-  // Other ports are firewalled. Default to 5000 if not specified.
-  // this serves both the API and the client.
-  // It is the only port that is not firewalled.
   const port = parseInt(process.env.PORT || "5000", 10);
   httpServer.listen(
     {
