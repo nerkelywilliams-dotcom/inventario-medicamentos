@@ -32,6 +32,7 @@ export async function registerRoutes(
   };
 
   app.use(authMiddleware);
+  
   // Auth
   app.post('/api/auth/login', async (req, res) => {
     try {
@@ -101,7 +102,7 @@ export async function registerRoutes(
     res.status(204).end();
   });
 
-  // Families
+  // --- FAMILIES ---
   app.get(api.families.list.path, async (req, res) => {
     if (!req.user) {
       return res.status(401).json({ message: 'No autorizado' });
@@ -138,6 +139,46 @@ export async function registerRoutes(
       return res.status(404).json({ message: 'Family not found' });
     }
     res.json(family);
+  });
+
+  // RUTAS NUEVAS: UPDATE & DELETE FAMILIES
+  app.patch("/api/families/:id", async (req, res) => {
+    if (!req.user) return res.status(401).json({ message: 'No autorizado' });
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: 'ID inválido' });
+
+      // Partial validation for patching
+      const data = insertFamilySchema.partial().parse(req.body);
+      const updated = await storage.updateFamily(id, data);
+      
+      if (!updated) {
+        return res.status(404).json({ message: "Familia no encontrada" });
+      }
+      
+      res.json(updated);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message });
+      }
+      res.status(400).json({ message: "Error al actualizar la familia" });
+    }
+  });
+
+  app.delete("/api/families/:id", async (req, res) => {
+    if (!req.user) return res.status(401).json({ message: 'No autorizado' });
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: 'ID inválido' });
+
+      await storage.deleteFamily(id);
+      res.status(204).end(); // Success, No Content
+    } catch (error) {
+      // Drizzle will throw if foreign keys exist (medications linked to family)
+      res.status(500).json({ 
+        message: "No se puede eliminar: existen medicamentos asociados a esta familia." 
+      });
+    }
   });
 
   // Medications

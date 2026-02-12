@@ -12,6 +12,9 @@ export interface IStorage {
   getFamilies(inventoryLocation?: string): Promise<Family[]>;
   getFamily(id: number): Promise<Family | undefined>;
   createFamily(family: InsertFamily & { inventoryLocation: string }): Promise<Family>;
+  // NUEVAS FUNCIONES DE FAMILIA
+  updateFamily(id: number, family: Partial<InsertFamily>): Promise<Family | undefined>;
+  deleteFamily(id: number): Promise<void>;
 
   // Medications
   getMedications(search?: string, familyId?: string, inventoryLocation?: string): Promise<MedicationWithFamily[]>;
@@ -28,6 +31,7 @@ export interface IStorage {
 }
 
 export class DatabaseStorage implements IStorage {
+  // --- FAMILIES ---
   async getFamilies(inventoryLocation?: string): Promise<Family[]> {
     if (inventoryLocation) {
       return await db.select().from(families).where(eq(families.inventoryLocation, inventoryLocation));
@@ -45,6 +49,22 @@ export class DatabaseStorage implements IStorage {
     return family;
   }
 
+  // Implementación de Actualizar Familia
+  async updateFamily(id: number, updates: Partial<InsertFamily>): Promise<Family | undefined> {
+    const [family] = await db
+      .update(families)
+      .set(updates)
+      .where(eq(families.id, id))
+      .returning();
+    return family;
+  }
+
+  // Implementación de Eliminar Familia
+  async deleteFamily(id: number): Promise<void> {
+    await db.delete(families).where(eq(families.id, id));
+  }
+
+  // --- MEDICATIONS ---
   async getMedications(search?: string, familyId?: string, inventoryLocation?: string): Promise<MedicationWithFamily[]> {
     const conditions = [];
     if (search) {
@@ -97,6 +117,7 @@ export class DatabaseStorage implements IStorage {
     await db.delete(medications).where(eq(medications.id, id));
   }
 
+  // --- USERS ---
   async getUsers(inventoryLocation?: string): Promise<User[]> {
     if (inventoryLocation) {
       return await db.select().from(users).where(eq(users.inventoryLocation, inventoryLocation));

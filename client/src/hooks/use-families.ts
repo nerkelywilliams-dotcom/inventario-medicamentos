@@ -1,61 +1,57 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api, buildUrl, type InsertFamily } from "@shared/routes";
-import { useAuth } from "@/context/AuthContext";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { type Family, type InsertFamily } from "@shared/schema";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 
-function encodeUserHeader(user: any): string {
-  return btoa(JSON.stringify(user));
+/**
+ * Hook para obtener todas las familias farmacéuticas
+ */
+export function useFamilies() {
+  return useQuery<Family[]>({
+    queryKey: ["/api/families"],
+  });
 }
 
-export function useFamilies() {
-  const { user } = useAuth();
-  
-  return useQuery({
-    queryKey: [api.families.list.path, user?.id],
-    queryFn: async () => {
-      const headers: HeadersInit = {
-        "Content-Type": "application/json",
-      };
-      
-      if (user) {
-        headers["x-user"] = encodeUserHeader(user);
-      }
-      
-      const res = await fetch(api.families.list.path, { 
-        headers,
-        credentials: "include" 
-      });
-      if (!res.ok) throw new Error("Failed to fetch families");
-      return api.families.list.responses[200].parse(await res.json());
+/**
+ * Hook para crear una nueva familia
+ */
+export function useCreateFamily() {
+  return useMutation({
+    mutationFn: async (data: InsertFamily) => {
+      const res = await apiRequest("POST", "/api/families", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      // Refresca la lista automáticamente en la UI
+      queryClient.invalidateQueries({ queryKey: ["/api/families"] });
     },
   });
 }
 
-export function useCreateFamily() {
-  const queryClient = useQueryClient();
-  const { user } = useAuth();
-  
+/**
+ * Hook para actualizar una familia existente
+ */
+export function useUpdateFamily() {
   return useMutation({
-    mutationFn: async (data: InsertFamily) => {
-      const headers: HeadersInit = {
-        "Content-Type": "application/json",
-      };
-      
-      if (user) {
-        headers["x-user"] = encodeUserHeader(user);
-      }
-      
-      const res = await fetch(api.families.create.path, {
-        method: api.families.create.method,
-        headers,
-        body: JSON.stringify(data),
-        credentials: "include",
-      });
-
-      if (!res.ok) throw new Error("Failed to create family");
-      return api.families.create.responses[201].parse(await res.json());
+    mutationFn: async ({ id, ...data }: InsertFamily & { id: number }) => {
+      const res = await apiRequest("PATCH", `/api/families/${id}`, data);
+      return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [api.families.list.path] });
+      queryClient.invalidateQueries({ queryKey: ["/api/families"] });
+    },
+  });
+}
+
+/**
+ * Hook para eliminar una familia
+ */
+export function useDeleteFamily() {
+  return useMutation({
+    mutationFn: async (id: number) => {
+      await apiRequest("DELETE", `/api/families/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/families"] });
     },
   });
 }
