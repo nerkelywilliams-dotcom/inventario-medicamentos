@@ -8,13 +8,11 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { MedicationForm } from "@/components/MedicationForm";
 import { MedicationDetail } from "@/components/MedicationDetail";
 import { ExpiryBadge, StockBadge } from "@/components/StatusBadges";
-import { Search, Plus, MoreHorizontal, FileDown, Eye, Pencil, Trash2, FilterX } from "lucide-react";
+import { Search, Plus, FileDown, Eye, Pencil, Trash2, FilterX } from "lucide-react";
 import { format } from "date-fns";
-import { es } from "date-fns/locale";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 
@@ -39,27 +37,24 @@ export default function Inventory() {
 
   const handleExport = () => {
     if (!medications) return;
-
     const data = medications.map(m => ({
       Nombre: m.name,
-      Dosis: m.dose, // <-- Incluido en el Excel
+      Dosis: m.dose,
       Familia: m.family?.name || "N/A",
       Presentacion: m.presentation,
       Cantidad: m.quantity,
       Vencimiento: format(new Date(m.expirationDate), "yyyy-MM-dd"),
       Estado: m.quantity === 0 ? "Agotado" : m.quantity < 10 ? "Bajo Stock" : "Disponible"
     }));
-
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Inventario");
     XLSX.writeFile(wb, `Inventario_${format(new Date(), "yyyy-MM-dd")}.xlsx`);
-    
     toast({ title: "Exportación exitosa", description: "El archivo Excel se ha descargado." });
   };
 
   const handleDelete = async (id: number) => {
-    if (confirm("¿Estás seguro de eliminar este medicamento?")) {
+    if (window.confirm("¿Estás seguro de eliminar este medicamento?")) {
       await deleteMutation.mutateAsync(id);
       toast({ title: "Eliminado", description: "El medicamento ha sido eliminado." });
     }
@@ -140,7 +135,7 @@ export default function Inventory() {
               <TableHead className="hidden md:table-cell">Familia</TableHead>
               <TableHead>Estado Stock</TableHead>
               <TableHead>Vencimiento</TableHead>
-              <TableHead className="w-[50px]"></TableHead>
+              <TableHead className="text-right">Acciones</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -151,7 +146,7 @@ export default function Inventory() {
                   <TableCell><Skeleton className="h-4 w-32" /></TableCell>
                   <TableCell><Skeleton className="h-6 w-20 rounded-full" /></TableCell>
                   <TableCell><Skeleton className="h-6 w-24 rounded-full" /></TableCell>
-                  <TableCell><Skeleton className="h-8 w-8 rounded-full" /></TableCell>
+                  <TableCell><Skeleton className="h-8 w-24 ml-auto" /></TableCell>
                 </TableRow>
               ))
             ) : medications?.length === 0 ? (
@@ -183,58 +178,53 @@ export default function Inventory() {
                   <TableCell>
                     <ExpiryBadge date={med.expirationDate} />
                   </TableCell>
-                  <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" className="h-8 w-8 p-0">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <Dialog open={detailId === med.id} onOpenChange={(open) => setDetailId(open ? med.id : null)}>
-                          <DialogTrigger asChild>
-                            <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="cursor-pointer">
-                              <Eye className="mr-2 h-4 w-4" /> Ver Ficha
-                            </DropdownMenuItem>
-                          </DialogTrigger>
-                          <MedicationDetail medication={med} open={detailId === med.id} onOpenChange={(open) => setDetailId(open ? med.id : null)} />
-                        </Dialog>
-                        
-                        {isAdmin && (
-                          <>
-                            <Dialog open={editingId === med.id} onOpenChange={(open) => setEditingId(open ? med.id : null)}>
-                              <DialogTrigger asChild>
-                                 <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="cursor-pointer">
-                                  <Pencil className="mr-2 h-4 w-4" /> Editar
-                                </DropdownMenuItem>
-                              </DialogTrigger>
-                              <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-                                <DialogHeader>
-                                  <DialogTitle>Editar Medicamento</DialogTitle>
-                                </DialogHeader>
-                                <MedicationForm 
-                                  defaultValues={med}
-                                  submitLabel="Guardar Cambios"
-                                  isLoading={updateMutation.isPending}
-                                  onSubmit={async (data) => {
-                                    await updateMutation.mutateAsync({ id: med.id, ...data });
-                                    setEditingId(null);
-                                    toast({ title: "Actualizado", description: "Cambios guardados correctamente." });
-                                  }}
-                                />
-                              </DialogContent>
-                            </Dialog>
+                  <TableCell className="text-right">
+                    <div className="flex justify-end gap-2">
+                      <Dialog open={detailId === med.id} onOpenChange={(open) => setDetailId(open ? med.id : null)}>
+                        <DialogTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <Eye className="h-4 w-4 text-blue-600" />
+                          </Button>
+                        </DialogTrigger>
+                        <MedicationDetail medication={med} open={detailId === med.id} onOpenChange={(open) => setDetailId(open ? med.id : null)} />
+                      </Dialog>
+                      
+                      {isAdmin && (
+                        <>
+                          <Dialog open={editingId === med.id} onOpenChange={(open) => setEditingId(open ? med.id : null)}>
+                            <DialogTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-8 w-8">
+                                <Pencil className="h-4 w-4 text-amber-600" />
+                              </Button>
+                            </DialogTrigger>
+                            <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+                              <DialogHeader>
+                                <DialogTitle>Editar Medicamento</DialogTitle>
+                              </DialogHeader>
+                              <MedicationForm 
+                                defaultValues={med}
+                                submitLabel="Guardar Cambios"
+                                isLoading={updateMutation.isPending}
+                                onSubmit={async (data) => {
+                                  await updateMutation.mutateAsync({ id: med.id, ...data });
+                                  setEditingId(null);
+                                  toast({ title: "Actualizado", description: "Cambios guardados correctamente." });
+                                }}
+                              />
+                            </DialogContent>
+                          </Dialog>
 
-                            <DropdownMenuItem 
-                              className="text-red-600 focus:text-red-600 cursor-pointer"
-                              onClick={() => handleDelete(med.id)}
-                            >
-                              <Trash2 className="mr-2 h-4 w-4" /> Eliminar
-                            </DropdownMenuItem>
-                          </>
-                        )}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-8 w-8"
+                            onClick={() => handleDelete(med.id)}
+                          >
+                            <Trash2 className="h-4 w-4 text-red-600" />
+                          </Button>
+                        </>
+                      )}
+                    </div>
                   </TableCell>
                 </TableRow>
               ))
