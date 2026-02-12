@@ -2,13 +2,13 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
-// --- NUEVOS IMPORTS NECESARIOS ---
+// --- NUEVOS IMPORTS ---
 import { db } from "./db";
 import { users } from "@shared/schema";
 import { eq } from "drizzle-orm";
 import { scrypt, randomBytes } from "crypto";
 import { promisify } from "util";
-// ---------------------------------
+// ----------------------
 
 const app = express();
 const httpServer = createServer(app);
@@ -66,42 +66,37 @@ app.use((req, res, next) => {
   next();
 });
 
-// --- FUNCIÓN PARA CREAR ADMIN (EL "CABALLO DE TROYA") ---
+// --- FUNCIÓN DE INYECCIÓN CORREGIDA ---
 async function seedAdminUser() {
   try {
-    console.log("🔍 Verificando si existe el usuario admin_mag...");
-    const [existingUser] = await db
-      .select()
-      .from(users)
-      .where(eq(users.username, "admin_mag"));
+    const scryptAsync = promisify(scrypt);
+    console.log("🔍 Limpiando e inyectando usuario admin_mag...");
 
-    if (!existingUser) {
-      console.log("⚠️ Usuario no encontrado. Creando admin_mag...");
-      
-      // Encriptamos la contraseña para que el login funcione
-      const salt = randomBytes(16).toString("hex");
-      const scryptAsync = promisify(scrypt);
-      const buf = (await scryptAsync("admin123", salt, 64)) as Buffer;
-      const hashedPassword = `${buf.toString("hex")}.${salt}`;
+    // 1. Borramos el usuario anterior para evitar el error de "Contraseña incorrecta"
+    await db.delete(users).where(eq(users.username, "admin_mag"));
 
-      await db.insert(users).values({
-        username: "admin_mag",
-        password: hashedPassword,
-        role: "admin",
-        sede: "SSIA Magdaleno",
-      });
-      console.log("✅ ¡ÉXITO! Usuario 'admin_mag' creado en la base de datos.");
-    } else {
-      console.log("ℹ️ El usuario 'admin_mag' ya existe. No se hicieron cambios.");
-    }
+    // 2. Creamos la encriptación fresca
+    const salt = randomBytes(16).toString("hex");
+    const buf = (await scryptAsync("admin123", salt, 64)) as Buffer;
+    const hashedPassword = `${buf.toString("hex")}.${salt}`;
+
+    // 3. Insertamos de nuevo
+    await db.insert(users).values({
+      username: "admin_mag",
+      password: hashedPassword,
+      role: "admin",
+      sede: "SSIA Magdaleno",
+    });
+    
+    console.log("✅ ¡ÉXITO! El usuario 'admin_mag' ha sido re-creado con admin123.");
   } catch (error) {
-    console.error("❌ Error intentando crear el usuario admin:", error);
+    console.error("❌ Error en la inyección:", error);
   }
 }
-// --------------------------------------------------------
+// --------------------------------------
 
 (async () => {
-  // Ejecutamos la inyección del usuario ANTES de iniciar las rutas
+  // Ejecutamos la inyección ANTES de que el servidor acepte conexiones
   await seedAdminUser();
 
   await registerRoutes(httpServer, app);
