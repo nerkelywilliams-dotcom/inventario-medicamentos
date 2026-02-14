@@ -50,8 +50,8 @@ export function MedicationForm({ defaultValues, onSubmit, isLoading, submitLabel
       indications: "",
       posology: "",
       administrationRoute: "",
-      contraindications: "", // Nuevo
-      interactions: "",      // Nuevo
+      contraindications: "",
+      interactions: "",
       ...defaultValues,
       expirationDate: defaultValues?.expirationDate 
         ? new Date(defaultValues.expirationDate).toISOString().split('T')[0]
@@ -91,7 +91,7 @@ export function MedicationForm({ defaultValues, onSubmit, isLoading, submitLabel
                   <Pill className="h-4 w-4 text-primary" /> Nombre Comercial
                 </FormLabel>
                 <FormControl>
-                  <Input placeholder="Ej. Paracetamol, Ibuprofeno..." {...field} />
+                  <Input placeholder="Ej. Paracetamol, Ibuprofeno..." {...field} value={field.value ?? ""} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -107,7 +107,7 @@ export function MedicationForm({ defaultValues, onSubmit, isLoading, submitLabel
                   <Activity className="h-4 w-4" /> Dosis
                 </FormLabel>
                 <FormControl>
-                  <Input placeholder="500mg, 1gr, 0.5%..." {...field} className="bg-white" />
+                  <Input placeholder="500mg, 1gr, 0.5%..." {...field} value={field.value ?? ""} className="bg-white" />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -122,11 +122,14 @@ export function MedicationForm({ defaultValues, onSubmit, isLoading, submitLabel
                 <FormLabel>Presentación</FormLabel>
                 {isCustomPresentation ? (
                   <div className="flex gap-2">
-                    <FormControl><Input {...field} autoFocus /></FormControl>
+                    <FormControl>
+                      {/* FIX: Aseguramos que el valor nunca sea null */}
+                      <Input {...field} value={field.value ?? ""} autoFocus />
+                    </FormControl>
                     <Button type="button" variant="ghost" size="icon" onClick={() => setIsCustomPresentation(false)}><X className="h-4 w-4" /></Button>
                   </div>
                 ) : (
-                  <Select onValueChange={(val) => val === "OTHER" ? setIsCustomPresentation(true) : field.onChange(val)} defaultValue={field.value}>
+                  <Select onValueChange={(val) => val === "OTHER" ? setIsCustomPresentation(true) : field.onChange(val)} value={field.value ?? undefined}>
                     <FormControl><SelectTrigger><SelectValue placeholder="Seleccionar..." /></SelectTrigger></FormControl>
                     <SelectContent>
                       {PRESENTACIONES.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
@@ -165,7 +168,7 @@ export function MedicationForm({ defaultValues, onSubmit, isLoading, submitLabel
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Stock</FormLabel>
-                  <FormControl><Input type="number" {...field} /></FormControl>
+                  <FormControl><Input type="number" {...field} value={field.value ?? 0} /></FormControl>
                   <FormMessage />
                 </FormItem>
               )}
@@ -176,7 +179,7 @@ export function MedicationForm({ defaultValues, onSubmit, isLoading, submitLabel
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Vencimiento</FormLabel>
-                  <FormControl><Input type="date" {...field} /></FormControl>
+                  <FormControl><Input type="date" {...field} value={field.value ?? ""} /></FormControl>
                   <FormMessage />
                 </FormItem>
               )}
@@ -190,6 +193,8 @@ export function MedicationForm({ defaultValues, onSubmit, isLoading, submitLabel
             📚 Ficha Farmacológica
           </h3>
           
+          
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <FormField
               control={form.control}
@@ -199,11 +204,18 @@ export function MedicationForm({ defaultValues, onSubmit, isLoading, submitLabel
                   <FormLabel>Vía de Administración</FormLabel>
                   {isCustomVia ? (
                     <div className="flex gap-2">
-                      <FormControl><Input {...field} autoFocus /></FormControl>
+                      <FormControl>
+                        {/* FIX: El error 2322 se soluciona con value={field.value ?? ""} */}
+                        <Input {...field} value={field.value ?? ""} autoFocus />
+                      </FormControl>
                       <Button type="button" variant="ghost" size="icon" onClick={() => setIsCustomVia(false)}><X className="h-4 w-4" /></Button>
                     </div>
                   ) : (
-                    <Select onValueChange={(val) => val === "OTHER" ? setIsCustomVia(true) : field.onChange(val)} defaultValue={field.value}>
+                    /* FIX: El error del Select se soluciona usando value en vez de defaultValue para mayor control */
+                    <Select 
+                      onValueChange={(val) => val === "OTHER" ? setIsCustomVia(true) : field.onChange(val)} 
+                      value={field.value ?? undefined}
+                    >
                       <FormControl><SelectTrigger><SelectValue placeholder="Seleccionar vía..." /></SelectTrigger></FormControl>
                       <SelectContent>
                         {VIAS_ADMIN.map(v => <SelectItem key={v} value={v}>{v}</SelectItem>)}
@@ -234,6 +246,7 @@ export function MedicationForm({ defaultValues, onSubmit, isLoading, submitLabel
             />
           </div>
 
+          {/* ... resto del código con los textareas que ya habías corregido ... */}
           <div className="space-y-4">
             <FormField
               control={form.control}
@@ -242,7 +255,7 @@ export function MedicationForm({ defaultValues, onSubmit, isLoading, submitLabel
                 <FormItem>
                   <FormLabel>Mecanismo de Acción</FormLabel>
                   <FormControl>
-                    <Textarea placeholder="Ej: Inhibidor reversible de la ciclooxigenasa..." className="h-20" {...field} value={field.value || ''} />
+                    <Textarea placeholder="Ej: Inhibidor reversible de la ciclooxigenasa..." className="h-20" {...field} value={field.value ?? ""} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -257,7 +270,7 @@ export function MedicationForm({ defaultValues, onSubmit, isLoading, submitLabel
                   <FormItem>
                     <FormLabel>Indicaciones</FormLabel>
                     <FormControl>
-                      <Textarea placeholder="Dolor, fiebre, inflamación..." className="h-20" {...field} value={field.value || ''} />
+                      <Textarea placeholder="Dolor, fiebre, inflamación..." className="h-20" {...field} value={field.value ?? ""} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -270,7 +283,7 @@ export function MedicationForm({ defaultValues, onSubmit, isLoading, submitLabel
                   <FormItem>
                     <FormLabel>Posología</FormLabel>
                     <FormControl>
-                      <Textarea placeholder="Adultos: 1 tableta cada 8 horas..." className="h-20" {...field} value={field.value || ''} />
+                      <Textarea placeholder="Adultos: 1 tableta cada 8 horas..." className="h-20" {...field} value={field.value ?? ""} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -278,7 +291,6 @@ export function MedicationForm({ defaultValues, onSubmit, isLoading, submitLabel
               />
             </div>
 
-            {/* NUEVOS CAMPOS: SEGURIDAD DEL PACIENTE */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField
                 control={form.control}
@@ -290,10 +302,10 @@ export function MedicationForm({ defaultValues, onSubmit, isLoading, submitLabel
                     </FormLabel>
                     <FormControl>
                       <Textarea 
-                        placeholder="Ej: Hipersensibilidad, úlcera péptica activa, 3er trimestre de embarazo..." 
+                        placeholder="Ej: Hipersensibilidad, úlcera péptica activa..." 
                         className="h-24 border-destructive/20 focus-visible:ring-destructive" 
                         {...field} 
-                        value={field.value || ''} 
+                        value={field.value ?? ""} 
                       />
                     </FormControl>
                     <FormMessage />
@@ -310,10 +322,10 @@ export function MedicationForm({ defaultValues, onSubmit, isLoading, submitLabel
                     </FormLabel>
                     <FormControl>
                       <Textarea 
-                        placeholder="Ej: Anticoagulantes, litio, otros AINEs..." 
+                        placeholder="Ej: Anticoagulantes, litio..." 
                         className="h-24 border-amber-200 focus-visible:ring-amber-500" 
                         {...field} 
-                        value={field.value || ''} 
+                        value={field.value ?? ""} 
                       />
                     </FormControl>
                     <FormMessage />
@@ -329,7 +341,7 @@ export function MedicationForm({ defaultValues, onSubmit, isLoading, submitLabel
                 <FormItem>
                   <FormLabel>Descripción Adicional</FormLabel>
                   <FormControl>
-                    <Textarea placeholder="Notas adicionales sobre el medicamento..." className="h-20" {...field} value={field.value || ''} />
+                    <Textarea placeholder="Notas adicionales..." className="h-20" {...field} value={field.value ?? ""} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
