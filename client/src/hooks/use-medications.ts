@@ -1,5 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api, buildUrl, type InsertMedication } from "@shared/routes";
+// ✅ CORRECCIÓN: Separamos las rutas de los esquemas de datos
+import { api, buildUrl } from "@shared/routes";
+import { type InsertMedication } from "@shared/schema"; 
 import { useAuth } from "@/context/AuthContext";
 import { z } from "zod";
 
@@ -14,7 +16,6 @@ export function useMedications(params?: { search?: string; familyId?: string }) 
   return useQuery({
     queryKey,
     queryFn: async () => {
-      // Build URL with query params manually since buildUrl only handles path params
       const url = new URL(api.medications.list.path, window.location.origin);
       if (params?.search) url.searchParams.append("search", params.search);
       if (params?.familyId) url.searchParams.append("familyId", params.familyId);
@@ -31,6 +32,7 @@ export function useMedications(params?: { search?: string; familyId?: string }) 
       if (!res.ok) throw new Error("Failed to fetch medications");
       return api.medications.list.responses[200].parse(await res.json());
     },
+    enabled: !!user, // Solo cargar si hay usuario
   });
 }
 
@@ -55,7 +57,7 @@ export function useMedication(id: number) {
       if (!res.ok) throw new Error("Failed to fetch medication");
       return api.medications.get.responses[200].parse(await res.json());
     },
-    enabled: !!id,
+    enabled: !!id && !!user,
   });
 }
 
@@ -65,10 +67,9 @@ export function useCreateMedication() {
   
   return useMutation({
     mutationFn: async (data: InsertMedication) => {
-      // Ensure numeric fields are numbers, dates are Dates
       const payload = {
         ...data,
-        expirationDate: new Date(data.expirationDate), // Ensure Date object
+        expirationDate: data.expirationDate ? new Date(data.expirationDate) : null,
       };
 
       const headers: HeadersInit = {
@@ -87,11 +88,8 @@ export function useCreateMedication() {
       });
 
       if (!res.ok) {
-        if (res.status === 400) {
-          const error = await res.json();
-          throw new Error(error.message || "Validation failed");
-        }
-        throw new Error("Failed to create medication");
+        const error = await res.json();
+        throw new Error(error.message || "Failed to create medication");
       }
       return api.medications.create.responses[201].parse(await res.json());
     },
@@ -109,7 +107,6 @@ export function useUpdateMedication() {
     mutationFn: async ({ id, ...updates }: { id: number } & Partial<InsertMedication>) => {
       const url = buildUrl(api.medications.update.path, { id });
       
-      // Ensure date is properly formatted if present
       const payload = { ...updates };
       if (payload.expirationDate) {
         payload.expirationDate = new Date(payload.expirationDate);

@@ -2,17 +2,21 @@ import { db } from "./db";
 import {
   families, medications, users,
   type Family, type InsertFamily,
-  type Medication, type InsertMedication, type MedicationWithFamily,
+  type Medication, type InsertMedication,
   type User, type InsertUser
 } from "@shared/schema";
 import { eq, ilike, and, desc } from "drizzle-orm";
+
+// ✅ Corregido: Definimos el tipo aquí para que no de error de importación (image_4fd418.png)
+export type MedicationWithFamily = Medication & {
+  family?: Family;
+};
 
 export interface IStorage {
   // Families
   getFamilies(inventoryLocation?: string): Promise<Family[]>;
   getFamily(id: number): Promise<Family | undefined>;
   createFamily(family: InsertFamily & { inventoryLocation: string }): Promise<Family>;
-  // NUEVAS FUNCIONES DE FAMILIA
   updateFamily(id: number, family: Partial<InsertFamily>): Promise<Family | undefined>;
   deleteFamily(id: number): Promise<void>;
 
@@ -49,7 +53,6 @@ export class DatabaseStorage implements IStorage {
     return family;
   }
 
-  // Implementación de Actualizar Familia
   async updateFamily(id: number, updates: Partial<InsertFamily>): Promise<Family | undefined> {
     const [family] = await db
       .update(families)
@@ -59,7 +62,6 @@ export class DatabaseStorage implements IStorage {
     return family;
   }
 
-  // Implementación de Eliminar Familia
   async deleteFamily(id: number): Promise<void> {
     await db.delete(families).where(eq(families.id, id));
   }
@@ -68,26 +70,24 @@ export class DatabaseStorage implements IStorage {
   async getMedications(search?: string, familyId?: string, inventoryLocation?: string): Promise<MedicationWithFamily[]> {
     const conditions = [];
     if (search) {
-      conditions.push(
-        ilike(medications.name, `%${search}%`)
-      );
+      conditions.push(ilike(medications.name, `%${search}%`));
     }
     if (familyId) {
       conditions.push(eq(medications.familyId, parseInt(familyId)));
     }
     if (inventoryLocation) {
+      // ✅ Coincide con la corrección de 'sede' -> 'inventoryLocation' (image_9b7dc4.jpg)
       conditions.push(eq(medications.inventoryLocation, inventoryLocation));
     }
 
-    const query = db.query.medications.findMany({
+    // Usamos la query de relación de Drizzle
+    return await db.query.medications.findMany({
       where: conditions.length > 0 ? and(...conditions) : undefined,
       with: {
         family: true
       },
       orderBy: desc(medications.createdAt)
-    });
-
-    return await query;
+    }) as MedicationWithFamily[];
   }
 
   async getMedication(id: number): Promise<MedicationWithFamily | undefined> {
@@ -96,7 +96,7 @@ export class DatabaseStorage implements IStorage {
       with: {
         family: true
       }
-    });
+    }) as MedicationWithFamily | undefined;
   }
 
   async createMedication(insertMedication: InsertMedication & { inventoryLocation: string }): Promise<Medication> {
