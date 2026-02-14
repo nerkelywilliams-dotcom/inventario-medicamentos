@@ -72,7 +72,7 @@ async function seedAdminUser() {
     const scryptAsync = promisify(scrypt);
     console.log("🔍 Limpiando e inyectando usuario admin_mag...");
 
-    // 1. Borramos el usuario anterior para evitar el error de "Contraseña incorrecta"
+    // 1. Borramos el usuario anterior para evitar conflictos
     await db.delete(users).where(eq(users.username, "admin_mag"));
 
     // 2. Creamos la encriptación fresca
@@ -80,12 +80,12 @@ async function seedAdminUser() {
     const buf = (await scryptAsync("admin123", salt, 64)) as Buffer;
     const hashedPassword = `${buf.toString("hex")}.${salt}`;
 
-    // 3. Insertamos de nuevo
+    // 3. Insertamos de nuevo usando 'inventoryLocation' en lugar de 'sede'
     await db.insert(users).values({
       username: "admin_mag",
       password: hashedPassword,
       role: "admin",
-      sede: "SSIA Magdaleno",
+      inventoryLocation: "SSIA Magdaleno", // ✅ Corregido según image_9b7dc4.jpg
     });
     
     console.log("✅ ¡ÉXITO! El usuario 'admin_mag' ha sido re-creado con admin123.");
