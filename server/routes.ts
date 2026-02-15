@@ -18,7 +18,7 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
-  // Middleware para extraer usuario del header (en una app real usarías JWT o sesiones)
+  // Middleware para extraer usuario del header
   const authMiddleware = (req: Request, res: Response, next: NextFunction) => {
     const userHeader = req.headers['x-user'];
     if (userHeader && typeof userHeader === 'string') {
@@ -33,7 +33,7 @@ export async function registerRoutes(
 
   app.use(authMiddleware);
   
-  // Auth
+  // --- AUTH ---
   app.post('/api/auth/login', async (req, res) => {
     try {
       const { username, password } = loginSchema.parse(req.body);
@@ -57,13 +57,19 @@ export async function registerRoutes(
     }
   });
 
-  // Users
+  // ✅ NUEVA RUTA: Obtener Logs para la bitácora
+  app.get('/api/logs', async (req, res) => {
+    if (!req.user) return res.status(401).json({ message: 'No autorizado' });
+    const logs = await storage.getRecentLogs(req.user.inventoryLocation, 20);
+    res.json(logs);
+  });
+
+  // --- USERS ---
   app.get('/api/users', async (req, res) => {
     if (!req.user) {
       return res.status(401).json({ message: 'No autorizado' });
     }
     const users = await storage.getUsers(req.user.inventoryLocation);
-    // Don't return passwords
     const safeUsers = users.map(({ password: _, ...user }) => user);
     res.json(safeUsers);
   });
@@ -141,14 +147,12 @@ export async function registerRoutes(
     res.json(family);
   });
 
-  // RUTAS NUEVAS: UPDATE & DELETE FAMILIES
   app.patch("/api/families/:id", async (req, res) => {
     if (!req.user) return res.status(401).json({ message: 'No autorizado' });
     try {
       const id = parseInt(req.params.id);
       if (isNaN(id)) return res.status(400).json({ message: 'ID inválido' });
 
-      // Partial validation for patching
       const data = insertFamilySchema.partial().parse(req.body);
       const updated = await storage.updateFamily(id, data);
       
@@ -172,16 +176,15 @@ export async function registerRoutes(
       if (isNaN(id)) return res.status(400).json({ message: 'ID inválido' });
 
       await storage.deleteFamily(id);
-      res.status(204).end(); // Success, No Content
+      res.status(204).end();
     } catch (error) {
-      // Drizzle will throw if foreign keys exist (medications linked to family)
       res.status(500).json({ 
         message: "No se puede eliminar: existen medicamentos asociados a esta familia." 
       });
     }
   });
 
-  // Medications
+  // --- MEDICATIONS ---
   app.get(api.medications.list.path, async (req, res) => {
     if (!req.user) {
       return res.status(401).json({ message: 'No autorizado' });
@@ -205,7 +208,6 @@ export async function registerRoutes(
       return res.status(401).json({ message: 'No autorizado' });
     }
     try {
-      // Handle Zod date coercion for expirationDate
       const body = {
         ...req.body,
         expirationDate: req.body.expirationDate ? new Date(req.body.expirationDate) : undefined,
@@ -216,6 +218,15 @@ export async function registerRoutes(
         ...input,
         inventoryLocation: req.user.inventoryLocation
       });
+
+      // ✅ LOG: Registro de ingreso
+      await storage.createLog({
+        userId: (req.user as any).id,
+        action: "INGRESO",
+        medicationName: medication.name,
+        details: `Registro inicial con ${medication.quantity} unidades.`
+      });
+
       res.status(201).json(medication);
     } catch (err) {
       if (err instanceof z.ZodError) {
@@ -229,16 +240,39 @@ export async function registerRoutes(
   });
 
   app.put(api.medications.update.path, async (req, res) => {
+    if (!req.user) return res.status(401).json({ message: 'No autorizado' });
     try {
-       const body = {
+      const id = Number(req.params.id);
+      const oldMed = await storage.getMedication(id);
+
+      const body = {
         ...req.body,
         expirationDate: req.body.expirationDate ? new Date(req.body.expirationDate) : undefined
       };
       const input = insertMedicationSchema.partial().parse(body);
-      const medication = await storage.updateMedication(Number(req.params.id), input);
+      const medication = await storage.updateMedication(id, input);
+      
       if (!medication) {
         return res.status(404).json({ message: 'Medication not found' });
       }
+
+      // ✅ LOG: Detección de cambios de stock o edición
+      if (oldMed) {
+        let action = "ACTUALIZACIÓN";
+        let details = "Datos actualizados.";
+        if (input.quantity !== undefined && input.quantity !== oldMed.quantity) {
+          const diff = input.quantity - oldMed.quantity;
+          action = diff > 0 ? "INGRESO" : "SALIDA";
+          details = diff > 0 ? `Se sumaron ${diff} unidades.` : `Se retiraron ${Math.abs(diff)} unidades.`;
+        }
+        await storage.createLog({
+          userId: (req.user as any).id,
+          action: action,
+          medicationName: medication.name,
+          details: details
+        });
+      }
+
       res.json(medication);
     } catch (err) {
       if (err instanceof z.ZodError) {
@@ -252,7 +286,20 @@ export async function registerRoutes(
   });
 
   app.delete(api.medications.delete.path, async (req, res) => {
-    await storage.deleteMedication(Number(req.params.id));
+    if (!req.user) return res.status(401).json({ message: 'No autorizado' });
+    const id = Number(req.params.id);
+    const med = await storage.getMedication(id);
+    
+    if (med) {
+      await storage.deleteMedication(id);
+      // ✅ LOG: Registro de eliminación
+      await storage.createLog({
+        userId: (req.user as any).id,
+        action: "ELIMINACIÓN",
+        medicationName: med.name,
+        details: "Medicamento eliminado del sistema."
+      });
+    }
     res.status(204).end();
   });
 
@@ -303,7 +350,6 @@ async function seedDatabase() {
     const today = new Date();
     const nextMonth = new Date(today); nextMonth.setMonth(today.getMonth() + 1);
     const nextYear = new Date(today); nextYear.setFullYear(today.getFullYear() + 1);
-    const lastMonth = new Date(today); lastMonth.setMonth(today.getMonth() - 1);
 
     await storage.createMedication({
       familyId: analgesicsMy.id,
@@ -312,11 +358,13 @@ async function seedDatabase() {
       quantity: 100,
       expirationDate: nextYear,
       description: "Analgésico y antipirético eficaz para el control del dolor leve a moderado y la fiebre.",
-      mechanismOfAction: "Inhibe la síntesis de prostaglandinas en el sistema nervioso central y bloquea la generación del impulso doloroso a nivel periférico.",
+      mechanismOfAction: "Inhibe la síntesis de prostaglandinas en el sistema nervioso central.",
       indications: "Dolor leve a moderado, fiebre.",
       posology: "Adultos: 500 mg - 1 g cada 4-6 horas.",
       administrationRoute: "Oral",
-      inventoryLocation: "maracay"
+      inventoryLocation: "maracay",
+      contraindications: "Hipersensibilidad, insuficiencia hepática grave.",
+      interactions: "Alcohol, anticoagulantes orales."
     });
 
     await storage.createMedication({
@@ -325,12 +373,14 @@ async function seedDatabase() {
       presentation: "Cápsulas 500mg",
       quantity: 5,
       expirationDate: nextMonth,
-      description: "Antibiótico de amplio espectro del grupo de las penicilinas.",
-      mechanismOfAction: "Bactericida. Inhibe la acción de peptidasas y carboxipeptidasas impidiendo la síntesis de la pared celular bacteriana.",
+      description: "Antibiótico de amplio espectro.",
+      mechanismOfAction: "Inhibe la síntesis de la pared celular bacteriana.",
       indications: "Infecciones respiratorias, de piel, urinarias.",
       posology: "500 mg cada 8 horas.",
       administrationRoute: "Oral",
-      inventoryLocation: "maracay"
+      inventoryLocation: "maracay",
+      contraindications: "Alergia a penicilinas.",
+      interactions: "Anticonceptivos orales, alopurinol."
     });
 
     // Seed medications for Magdaleno
@@ -345,7 +395,9 @@ async function seedDatabase() {
       indications: "Dolor moderado a severo, fiebre.",
       posology: "Adultos: 500 mg - 1g cada 4-6 horas.",
       administrationRoute: "Oral",
-      inventoryLocation: "magdaleno"
+      inventoryLocation: "magdaleno",
+      contraindications: "Hipersensibilidad, agranulocitosis.",
+      interactions: "Ciclosporina."
     });
 
     await storage.createMedication({
@@ -359,41 +411,18 @@ async function seedDatabase() {
       indications: "Inflamación, dolor articular.",
       posology: "50-100 mg cada 8-12 horas.",
       administrationRoute: "Oral",
-      inventoryLocation: "magdaleno"
+      inventoryLocation: "magdaleno",
+      contraindications: "Úlcera péptica activa.",
+      interactions: "Litio, digoxina."
     });
   }
 
   // Seed users
   const existingUsers = await storage.getUsers();
   if (existingUsers.length === 0) {
-    // Admin y visualizador para Maracay
-    await storage.createUser({
-      username: 'admin_maracay',
-      password: 'admin123',
-      role: 'admin',
-      inventoryLocation: 'maracay'
-    });
-
-    await storage.createUser({
-      username: 'usuario_maracay',
-      password: 'perfil123',
-      role: 'viewer',
-      inventoryLocation: 'maracay'
-    });
-
-    // Admin y visualizador para Magdaleno
-    await storage.createUser({
-      username: 'admin_magdaleno',
-      password: 'admin123',
-      role: 'admin',
-      inventoryLocation: 'magdaleno'
-    });
-
-    await storage.createUser({
-      username: 'usuario_magdaleno',
-      password: 'perfil123',
-      role: 'viewer',
-      inventoryLocation: 'magdaleno'
-    });
+    await storage.createUser({ username: 'admin_maracay', password: 'admin123', role: 'admin', inventoryLocation: 'maracay' });
+    await storage.createUser({ username: 'usuario_maracay', password: 'perfil123', role: 'viewer', inventoryLocation: 'maracay' });
+    await storage.createUser({ username: 'admin_magdaleno', password: 'admin123', role: 'admin', inventoryLocation: 'magdaleno' });
+    await storage.createUser({ username: 'usuario_magdaleno', password: 'perfil123', role: 'viewer', inventoryLocation: 'magdaleno' });
   }
 }

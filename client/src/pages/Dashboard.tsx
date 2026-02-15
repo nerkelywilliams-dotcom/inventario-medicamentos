@@ -1,11 +1,15 @@
+import { useLogs } from "@/hooks/use-logs";
 import { useMedications } from "@/hooks/use-medications";
-import { Pill, AlertCircle, AlertTriangle, Clock, ArrowDownLeft, ArrowUpRight, FileEdit, History } from "lucide-react";
+import { Pill, AlertCircle, AlertTriangle, Clock, ArrowDownLeft, ArrowUpRight, FileEdit, History, RefreshCw } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 import { differenceInDays, isAfter, format } from "date-fns";
-import { es } from "date-fns/locale"; // Asegúrate de tener esto, si no usa 'en-US' o elimina el locale
+import { es } from "date-fns/locale";
 
 export default function Dashboard() {
   const { data: medications } = useMedications();
+  // ✅ CARGA DE LOGS REALES
+  const { data: logs, isLoading: isLoadingLogs } = useLogs();
+  
   const now = new Date();
 
   const total = medications?.length || 0;
@@ -22,15 +26,6 @@ export default function Dashboard() {
     { name: 'Disponible', value: total - lowStock - expired, color: '#2b4cc4' },
     { name: 'Bajo Stock', value: lowStock, color: '#1a2b4b' },
     { name: 'Agotado', value: expired, color: '#dc2626' },
-  ];
-
-  // SIMULACIÓN DE DATOS DE AUDITORÍA (Esto vendrá de tu API filtrado por ID de Inventario)
-  // En el futuro: const { data: activities } = useQuery(['/api/activities'])
-  const recentActivity = [
-    { id: 1, type: 'IN', product: 'Amoxicilina 500mg', quantity: 50, user: 'Admin', date: new Date() },
-    { id: 2, type: 'OUT', product: 'Losartán 50mg', quantity: 12, user: 'Dr. Pérez', date: new Date(Date.now() - 3600000) },
-    { id: 3, type: 'UPDATE', product: 'Ibuprofeno', detail: 'Corrección de stock', user: 'Admin', date: new Date(Date.now() - 7200000) },
-    { id: 4, type: 'OUT', product: 'Guantes Quirúrgicos', quantity: 100, user: 'Enfermería', date: new Date(Date.now() - 86400000) },
   ];
 
   return (
@@ -115,7 +110,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* --- NUEVA SECCIÓN: HISTORIAL DE MOVIMIENTOS --- */}
+      {/* --- SECCIÓN SINCRONIZADA: BITÁCORA REAL --- */}
       <div className="bg-white rounded-[3.5rem] p-12 border border-slate-100 shadow-lg shadow-slate-200/50">
         <div className="flex items-center justify-between mb-8">
             <div className="flex items-center gap-3">
@@ -127,7 +122,7 @@ export default function Dashboard() {
                     <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Últimos cambios registrados</p>
                 </div>
             </div>
-            <button className="text-sm font-bold text-[#2b4cc4] hover:underline">Ver todo</button>
+            {isLoadingLogs && <RefreshCw className="h-4 w-4 animate-spin text-slate-400" />}
         </div>
 
         <div className="overflow-x-auto">
@@ -141,40 +136,50 @@ export default function Dashboard() {
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
-                    {recentActivity.map((activity) => (
-                        <tr key={activity.id} className="group hover:bg-slate-50 transition-colors">
+                    {logs?.map((log) => (
+                        <tr key={log.id} className="group hover:bg-slate-50 transition-colors">
                             <td className="py-4 pl-4">
                                 <div className={`w-10 h-10 rounded-xl flex items-center justify-center 
-                                    ${activity.type === 'IN' ? 'bg-emerald-100 text-emerald-600' : 
-                                      activity.type === 'OUT' ? 'bg-rose-100 text-rose-600' : 'bg-amber-100 text-amber-600'}`}>
-                                    {activity.type === 'IN' && <ArrowDownLeft size={20} />}
-                                    {activity.type === 'OUT' && <ArrowUpRight size={20} />}
-                                    {activity.type === 'UPDATE' && <FileEdit size={20} />}
+                                    ${log.action === 'INGRESO' ? 'bg-emerald-100 text-emerald-600' : 
+                                      log.action === 'SALIDA' ? 'bg-rose-100 text-rose-600' : 
+                                      log.action === 'ELIMINACIÓN' ? 'bg-red-100 text-red-600' : 'bg-amber-100 text-amber-600'}`}>
+                                    {log.action === 'INGRESO' && <ArrowDownLeft size={20} />}
+                                    {log.action === 'SALIDA' && <ArrowUpRight size={20} />}
+                                    {(log.action === 'ACTUALIZACIÓN' || log.action === 'ELIMINACIÓN') && <FileEdit size={20} />}
                                 </div>
                             </td>
                             <td className="py-4">
-                                <p className="font-bold text-[#1a2b4b] text-sm">{activity.product}</p>
+                                <p className="font-bold text-[#1a2b4b] text-sm">{log.medicationName}</p>
                                 <p className="text-xs font-medium text-slate-500">
-                                    {activity.type === 'UPDATE' ? activity.detail : 
-                                     activity.type === 'IN' ? `Ingreso de ${activity.quantity} uds` : `Despacho de ${activity.quantity} uds`}
+                                    {log.details}
                                 </p>
                             </td>
                             <td className="py-4">
                                 <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 text-xs font-bold">
-                                    {activity.user}
+                                    {log.user.username}
                                 </span>
                             </td>
                             <td className="py-4 text-right pr-4">
-                                <p className="text-sm font-bold text-slate-600">{format(activity.date, 'dd MMM', { locale: es })}</p>
-                                <p className="text-[10px] font-medium text-slate-400">{format(activity.date, 'HH:mm')}</p>
+                                <p className="text-sm font-bold text-slate-600">
+                                  {format(new Date(log.timestamp), 'dd MMM', { locale: es })}
+                                </p>
+                                <p className="text-[10px] font-medium text-slate-400">
+                                  {format(new Date(log.timestamp), 'HH:mm')}
+                                </p>
                             </td>
                         </tr>
                     ))}
+                    {logs?.length === 0 && (
+                      <tr>
+                        <td colSpan={4} className="py-10 text-center text-slate-400 font-bold italic">
+                          No se han registrado movimientos todavía.
+                        </td>
+                      </tr>
+                    )}
                 </tbody>
             </table>
         </div>
       </div>
-
     </div>
   );
 }

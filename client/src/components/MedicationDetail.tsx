@@ -1,6 +1,7 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
 import { type Medication, type Family } from "@shared/schema";
 import { ExpiryBadge, StockBadge } from "./StatusBadges";
 import { 
@@ -13,11 +14,10 @@ import {
   Calendar, 
   Syringe, 
   Loader2,
-  AlertOctagon, // Nuevo
-  RefreshCw      // Nuevo
+  AlertOctagon,
+  RefreshCw,
+  Tag
 } from "lucide-react";
-import { Separator } from "@/components/ui/separator";
-import { Badge } from "@/components/ui/badge";
 import { useEffect, useState } from "react";
 
 interface MedicationDetailProps {
@@ -52,12 +52,8 @@ export function MedicationDetail({
             setMedication(fullData);
             setHasLoadedFullData(true);
           })
-          .catch(error => {
-            console.error("Error cargando datos completos:", error);
-          })
-          .finally(() => {
-            setIsLoading(false);
-          });
+          .catch(error => console.error("Error cargando ficha técnica:", error))
+          .finally(() => setIsLoading(false));
       }
     }
   }, [open, fetchFullData, hasLoadedFullData, initialMedication]);
@@ -74,18 +70,15 @@ export function MedicationDetail({
     mechanismOfAction: medication.mechanismOfAction || "No especificado",
     indications: medication.indications || "No especificadas",
     posology: medication.posology || "No especificada",
-    contraindications: medication.contraindications || "No especificadas", // Nuevo
-    interactions: medication.interactions || "No especificadas",           // Nuevo
-    description: medication.description || "Sin descripción",
-    imageUrl: medication.imageUrl || "",
+    contraindications: medication.contraindications || "Sin contraindicaciones registradas",
+    interactions: medication.interactions || "Sin interacciones registradas",
+    description: medication.description || "Sin descripción adicional",
   };
 
   const formatExpiryDate = (date: Date | string) => {
     try {
       return new Date(date).toLocaleDateString('es-ES', {
-        day: 'numeric',
-        month: 'long',
-        year: 'numeric'
+        day: 'numeric', month: 'long', year: 'numeric'
       });
     } catch {
       return "Fecha no disponible";
@@ -95,231 +88,166 @@ export function MedicationDetail({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       {trigger && <DialogTrigger asChild>{trigger}</DialogTrigger>}
-      <DialogContent className="max-w-4xl max-h-[90vh] p-0 overflow-hidden rounded-2xl">
+      <DialogContent className="max-w-4xl max-h-[95vh] p-0 overflow-hidden border-none shadow-2xl">
         {isLoading ? (
-          <div className="flex items-center justify-center h-64">
-            <div className="text-center">
-              <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
-              <p className="text-muted-foreground">Cargando ficha técnica...</p>
-            </div>
+          <div className="flex flex-col items-center justify-center h-80 space-y-4">
+            <Loader2 className="h-10 w-10 animate-spin text-primary" />
+            <p className="text-muted-foreground font-medium">Consultando Vademécum interno...</p>
           </div>
         ) : (
           <>
-            <div className="bg-gradient-to-r from-primary to-primary/90 px-8 py-8 text-primary-foreground">
-              <div className="flex flex-col md:flex-row items-start justify-between gap-6">
-                <div className="flex-1">
-                  <div className="flex flex-wrap items-center gap-2 mb-3">
+            {/* Header Médico con Gradiente */}
+            <div className="bg-gradient-to-br from-primary via-primary/90 to-blue-700 px-8 py-10 text-primary-foreground relative">
+              <div className="absolute top-4 right-8 opacity-10">
+                <Activity className="h-24 w-24" />
+              </div>
+              
+              <div className="flex flex-col md:flex-row items-start justify-between gap-6 relative z-10">
+                <div className="flex-1 space-y-4">
+                  <div className="flex flex-wrap items-center gap-2">
                     {safeMedication.family?.name && (
-                      <Badge variant="secondary" className="bg-white/20 text-white hover:bg-white/30 border-0">
-                        {safeMedication.family.name}
+                      <Badge className="bg-white/20 hover:bg-white/30 text-white border-none backdrop-blur-md uppercase text-[10px] tracking-widest font-bold">
+                        <Tag className="h-3 w-3 mr-1" /> {safeMedication.family.name}
                       </Badge>
                     )}
-                    <span className="text-sm opacity-90 bg-white/10 px-3 py-1 rounded-full">
+                    <Badge variant="outline" className="text-white border-white/40 font-normal">
                       {safeMedication.presentation}
-                    </span>
-                    <Badge className="bg-white text-primary hover:bg-white font-bold border-0 shadow-sm">
-                      Dosis: {safeMedication.dose}
                     </Badge>
                   </div>
-                  <h2 className="text-3xl font-bold tracking-tight mb-2">{safeMedication.name}</h2>
-                  <div className="flex flex-wrap items-center gap-4 text-sm opacity-90">
-                    <div className="flex items-center gap-1">
-                      <Package className="h-3 w-3" />
-                      <span>Familia: {safeMedication.family?.name || "Sin familia asignada"}</span>
+                  
+                  <div>
+                    <h2 className="text-4xl font-black tracking-tight leading-none mb-2">
+                      {safeMedication.name}
+                    </h2>
+                    <p className="text-primary-foreground/80 text-lg font-medium flex items-center gap-2">
+                      <Activity className="h-5 w-5" />
+                      Concentración: {safeMedication.dose}
+                    </p>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-5 text-sm font-medium pt-2">
+                    <div className="flex items-center gap-1.5 bg-black/10 px-3 py-1 rounded-full">
+                      <Calendar className="h-4 w-4" />
+                      <span>Expira: {formatExpiryDate(safeMedication.expirationDate)}</span>
                     </div>
-                    <div className="flex items-center gap-1">
-                      <Calendar className="h-3 w-3" />
-                      <span>Vence: {formatExpiryDate(safeMedication.expirationDate)}</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Syringe className="h-3 w-3" />
-                      <span>Vía: {safeMedication.administrationRoute}</span>
+                    <div className="flex items-center gap-1.5 bg-black/10 px-3 py-1 rounded-full">
+                      <Syringe className="h-4 w-4" />
+                      <span>Vía {safeMedication.administrationRoute}</span>
                     </div>
                   </div>
                 </div>
-                
+
                 {safeMedication.imageUrl && (
-                  <div className="h-24 w-24 rounded-xl bg-white p-2 shrink-0 overflow-hidden shadow-lg border border-white/20">
+                  <div className="h-32 w-32 rounded-2xl bg-white p-3 shrink-0 shadow-2xl border border-white/20 transform md:rotate-3">
                     <img 
                       src={safeMedication.imageUrl} 
                       alt={safeMedication.name} 
                       className="h-full w-full object-contain"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).src = "/placeholder-medication.png";
-                      }}
                     />
                   </div>
                 )}
               </div>
             </div>
 
-            <ScrollArea className="max-h-[calc(90vh-180px)]">
-              <div className="p-8 space-y-8">
-                {/* Grid de Estado con Dosis Resaltada */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 p-6 bg-gradient-to-br from-muted/20 to-muted/5 rounded-2xl border border-border/30">
-                  <div className="flex items-center gap-4">
-                    <div className="bg-blue-100 p-3 rounded-full text-blue-600">
-                      <Pill className="h-6 w-6" />
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground font-medium uppercase tracking-wider">Inventario</p>
-                      <div className="flex items-center gap-2 mt-1">
-                        <StockBadge quantity={safeMedication.quantity} />
-                        <span className="text-lg font-semibold">{safeMedication.quantity} unidades</span>
+            <ScrollArea className="max-h-[calc(95vh-240px)] bg-background">
+              <div className="p-8 space-y-10">
+                
+                {/* Dashboard de Estado Rápido */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="flex items-center justify-between p-5 bg-muted/30 rounded-2xl border border-border/50">
+                    <div className="flex items-center gap-4">
+                      <div className="bg-primary/10 p-3 rounded-xl text-primary">
+                        <Package className="h-6 w-6" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-bold text-muted-foreground uppercase tracking-tighter">Stock Disponible</p>
+                        <p className="text-2xl font-black">{safeMedication.quantity} <span className="text-sm font-medium text-muted-foreground">unidades</span></p>
                       </div>
                     </div>
-                  </div>
-                  
-                  <div className="flex items-center gap-4 bg-primary/10 p-4 rounded-xl border border-primary/20 shadow-sm">
-                    <div className="bg-primary p-3 rounded-full text-white">
-                      <Activity className="h-6 w-6" />
-                    </div>
-                    <div>
-                      <p className="text-[10px] text-primary font-bold uppercase tracking-widest leading-none mb-1">Dosis Recomendada</p>
-                      <p className="text-xl font-black text-primary leading-tight">{safeMedication.dose}</p>
-                    </div>
+                    <StockBadge quantity={safeMedication.quantity} />
                   </div>
 
-                  <div className="flex items-center gap-4">
-                    <div className="bg-amber-100 p-3 rounded-full text-amber-600">
-                      <Clock className="h-6 w-6" />
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground font-medium uppercase tracking-wider">Vencimiento</p>
-                      <div className="mt-1">
-                        <ExpiryBadge date={safeMedication.expirationDate} />
+                  <div className="flex items-center justify-between p-5 bg-muted/30 rounded-2xl border border-border/50">
+                    <div className="flex items-center gap-4">
+                      <div className="bg-amber-100 p-3 rounded-xl text-amber-600">
+                        <Clock className="h-6 w-6" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-bold text-muted-foreground uppercase tracking-tighter">Estado de Alerta</p>
+                        <p className="text-sm font-semibold">Revisar fecha de vencimiento</p>
                       </div>
                     </div>
+                    <ExpiryBadge date={safeMedication.expirationDate} />
                   </div>
                 </div>
 
-                {/* Sección de Descripción */}
-                {safeMedication.description && safeMedication.description !== "Sin descripción" && (
-                  <section className="space-y-3">
-                    <h3 className="font-semibold text-xl flex items-center gap-2 text-primary">
-                      <FileText className="h-5 w-5" />
-                      Descripción General
-                    </h3>
-                    <div className="p-4 bg-muted/10 rounded-lg border">
-                      <p className="text-foreground leading-relaxed">{safeMedication.description}</p>
+                {/* Información Farmacológica Principal */}
+                <div className="grid md:grid-cols-2 gap-10">
+                  <section className="space-y-4">
+                    <div className="flex items-center gap-2 text-primary border-b border-primary/10 pb-2">
+                      <Activity className="h-5 w-5" />
+                      <h4 className="font-bold text-lg uppercase tracking-tight">Farmacodinamia</h4>
+                    </div>
+                    <div className="space-y-4">
+                      <div>
+                        <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Mecanismo de Acción</label>
+                        <p className="text-sm leading-relaxed mt-1 text-foreground/90">{safeMedication.mechanismOfAction}</p>
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Indicaciones Terapéuticas</label>
+                        <p className="text-sm leading-relaxed mt-1 text-foreground/90">{safeMedication.indications}</p>
+                      </div>
                     </div>
                   </section>
-                )}
 
-                {/* Ficha Técnica: Mecanismo, Posología, Indicaciones */}
-                <div className="space-y-6">
-                  <h3 className="font-semibold text-2xl border-b pb-2">Información Clínica</h3>
-                  <div className="grid md:grid-cols-2 gap-8">
-                    <div className="space-y-6">
-                      <section className="space-y-3">
-                        <div className="flex items-center gap-2 text-primary">
-                          <Activity className="h-5 w-5" />
-                          <h4 className="font-semibold text-lg">Mecanismo de Acción</h4>
-                        </div>
-                        <div className="p-4 bg-muted/10 rounded-lg border">
-                          <p className="text-foreground leading-relaxed">{safeMedication.mechanismOfAction}</p>
-                        </div>
-                      </section>
-                      <section className="space-y-3">
-                        <div className="flex items-center gap-2 text-primary">
-                          <FileText className="h-5 w-5" />
-                          <h4 className="font-semibold text-lg">Posología</h4>
-                        </div>
-                        <div className="p-4 bg-muted/10 rounded-lg border">
-                          <p className="text-foreground leading-relaxed">{safeMedication.posology}</p>
-                        </div>
-                      </section>
+                  <section className="space-y-4">
+                    <div className="flex items-center gap-2 text-primary border-b border-primary/10 pb-2">
+                      <FileText className="h-5 w-5" />
+                      <h4 className="font-bold text-lg uppercase tracking-tight">Administración</h4>
                     </div>
-                    <div className="space-y-6">
-                      <section className="space-y-3">
-                        <div className="flex items-center gap-2 text-primary">
-                          <AlertTriangle className="h-5 w-5" />
-                          <h4 className="font-semibold text-lg">Indicaciones</h4>
+                    <div className="space-y-4">
+                      <div>
+                        <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Posología Recomendada</label>
+                        <div className="bg-blue-50/50 p-3 rounded-lg border border-blue-100/50 mt-1">
+                          <p className="text-sm leading-relaxed text-blue-900 font-medium">{safeMedication.posology}</p>
                         </div>
-                        <div className="p-4 bg-muted/10 rounded-lg border">
-                          <p className="text-foreground leading-relaxed">{safeMedication.indications}</p>
-                        </div>
-                      </section>
-                      <section className="space-y-3">
-                        <div className="flex items-center gap-2 text-primary">
-                          <Pill className="h-5 w-5" />
-                          <h4 className="font-semibold text-lg">Vía de Administración</h4>
-                        </div>
-                        <div className="p-4 bg-muted/10 rounded-lg border">
-                          <p className="text-foreground leading-relaxed">{safeMedication.administrationRoute}</p>
-                        </div>
-                      </section>
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Descripción del Fármaco</label>
+                        <p className="text-sm leading-relaxed mt-1 text-foreground/80 italic">{safeMedication.description}</p>
+                      </div>
                     </div>
-                  </div>
+                  </section>
                 </div>
 
-                {/* NUEVO: SECCIÓN DE SEGURIDAD Y ALERTAS (CRÍTICO) */}
-                <div className="space-y-6 pt-6 border-t">
-                  <h3 className="font-semibold text-2xl text-destructive flex items-center gap-2">
-                    <AlertOctagon className="h-6 w-6" />
-                    Seguridad del Paciente
-                  </h3>
-                  <div className="grid md:grid-cols-2 gap-8">
-                    <section className="space-y-3">
-                      <div className="flex items-center gap-2 text-destructive font-bold">
-                        <AlertOctagon className="h-5 w-5" />
-                        <h4 className="text-lg">Contraindicaciones</h4>
-                      </div>
-                      <div className="p-4 bg-destructive/5 rounded-xl border border-destructive/10 min-h-[100px]">
-                        <p className="text-foreground leading-relaxed italic">
-                          {safeMedication.contraindications}
-                        </p>
-                      </div>
-                    </section>
-
-                    <section className="space-y-3">
-                      <div className="flex items-center gap-2 text-amber-600 font-bold">
-                        <RefreshCw className="h-5 w-5" />
-                        <h4 className="text-lg">Interacciones</h4>
-                      </div>
-                      <div className="p-4 bg-amber-50/50 rounded-xl border border-amber-100 min-h-[100px]">
-                        <p className="text-foreground leading-relaxed">
-                          {safeMedication.interactions}
-                        </p>
-                      </div>
-                    </section>
+                {/* Sección Crítica: Seguridad */}
+                <div className="bg-destructive/5 rounded-3xl border border-destructive/20 overflow-hidden">
+                  <div className="bg-destructive/10 px-6 py-3 flex items-center gap-2 text-destructive font-black uppercase text-xs tracking-widest">
+                    <AlertOctagon className="h-4 w-4" />
+                    Protocolo de Seguridad y Contraindicaciones
                   </div>
-                  <p className="text-[10px] text-muted-foreground text-center italic mt-4">
-                    * Esta información es de carácter referencial. Verifique siempre con el prospecto oficial del fármaco.
-                  </p>
-                </div>
-
-                {/* Footer Resumen */}
-                <div className="pt-6 border-t pb-4">
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
-                    <div className="flex items-center gap-2 p-3 bg-muted/10 rounded-lg">
-                      <Activity className="h-4 w-4 text-primary" />
-                      <div>
-                        <p className="font-medium text-[11px] uppercase opacity-70">Dosis</p>
-                        <p className="font-semibold truncate">{safeMedication.dose}</p>
-                      </div>
+                  <div className="p-8 grid md:grid-cols-2 gap-8">
+                    <div className="space-y-2">
+                      <h5 className="text-sm font-bold flex items-center gap-2 text-destructive">
+                        <AlertTriangle className="h-4 w-4" /> Contraindicaciones Absolutas
+                      </h5>
+                      <p className="text-sm leading-relaxed text-foreground font-medium p-4 bg-white rounded-xl border border-destructive/10">
+                        {safeMedication.contraindications}
+                      </p>
                     </div>
-                    <div className="flex items-center gap-2 p-3 bg-muted/10 rounded-lg">
-                      <Package className="h-4 w-4 text-muted-foreground" />
-                      <div>
-                        <p className="font-medium text-[11px] uppercase opacity-70">Tipo</p>
-                        <p className="text-muted-foreground truncate">{safeMedication.presentation}</p>
-                      </div>
+                    <div className="space-y-2">
+                      <h5 className="text-sm font-bold flex items-center gap-2 text-amber-600">
+                        <RefreshCw className="h-4 w-4" /> Interacciones Medicamentosas
+                      </h5>
+                      <p className="text-sm leading-relaxed text-foreground p-4 bg-white rounded-xl border border-amber-200/50">
+                        {safeMedication.interactions}
+                      </p>
                     </div>
-                    <div className="flex items-center gap-2 p-3 bg-muted/10 rounded-lg">
-                      <Calendar className="h-4 w-4 text-muted-foreground" />
-                      <div>
-                        <p className="font-medium text-[11px] uppercase opacity-70">Vence</p>
-                        <p className="text-muted-foreground">{new Date(safeMedication.expirationDate).toLocaleDateString()}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 p-3 bg-muted/10 rounded-lg">
-                      <Syringe className="h-4 w-4 text-muted-foreground" />
-                      <div>
-                        <p className="font-medium text-[11px] uppercase opacity-70">Vía</p>
-                        <p className="text-muted-foreground truncate">{safeMedication.administrationRoute}</p>
-                      </div>
-                    </div>
+                  </div>
+                  <div className="px-8 pb-6 text-center">
+                    <p className="text-[9px] text-muted-foreground uppercase tracking-widest font-medium">
+                      *** Documento generado para uso interno - SSIA Farmacia ***
+                    </p>
                   </div>
                 </div>
               </div>

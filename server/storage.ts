@@ -1,13 +1,14 @@
 import { db } from "./db";
 import {
-  families, medications, users,
+  families, medications, users, logs,
   type Family, type InsertFamily,
   type Medication, type InsertMedication,
-  type User, type InsertUser
+  type User, type InsertUser,
+  type Log, type InsertLog, type LogWithUser
 } from "@shared/schema";
 import { eq, ilike, and, desc } from "drizzle-orm";
 
-// ✅ Corregido: Definimos el tipo aquí para que no de error de importación (image_4fd418.png)
+// Tipo compuesto para inventario
 export type MedicationWithFamily = Medication & {
   family?: Family;
 };
@@ -32,6 +33,10 @@ export interface IStorage {
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser & { inventoryLocation: string }): Promise<User>;
   deleteUser(id: number): Promise<void>;
+
+  // ✅ NUEVO: Logs (Bitácora)
+  createLog(log: InsertLog): Promise<Log>;
+  getRecentLogs(inventoryLocation?: string, limit?: number): Promise<LogWithUser[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -69,23 +74,13 @@ export class DatabaseStorage implements IStorage {
   // --- MEDICATIONS ---
   async getMedications(search?: string, familyId?: string, inventoryLocation?: string): Promise<MedicationWithFamily[]> {
     const conditions = [];
-    if (search) {
-      conditions.push(ilike(medications.name, `%${search}%`));
-    }
-    if (familyId) {
-      conditions.push(eq(medications.familyId, parseInt(familyId)));
-    }
-    if (inventoryLocation) {
-      // ✅ Coincide con la corrección de 'sede' -> 'inventoryLocation' (image_9b7dc4.jpg)
-      conditions.push(eq(medications.inventoryLocation, inventoryLocation));
-    }
+    if (search) conditions.push(ilike(medications.name, `%${search}%`));
+    if (familyId) conditions.push(eq(medications.familyId, parseInt(familyId)));
+    if (inventoryLocation) conditions.push(eq(medications.inventoryLocation, inventoryLocation));
 
-    // Usamos la query de relación de Drizzle
     return await db.query.medications.findMany({
       where: conditions.length > 0 ? and(...conditions) : undefined,
-      with: {
-        family: true
-      },
+      with: { family: true },
       orderBy: desc(medications.createdAt)
     }) as MedicationWithFamily[];
   }
@@ -93,9 +88,7 @@ export class DatabaseStorage implements IStorage {
   async getMedication(id: number): Promise<MedicationWithFamily | undefined> {
     return await db.query.medications.findFirst({
       where: eq(medications.id, id),
-      with: {
-        family: true
-      }
+      with: { family: true }
     }) as MedicationWithFamily | undefined;
   }
 
@@ -137,6 +130,27 @@ export class DatabaseStorage implements IStorage {
 
   async deleteUser(id: number): Promise<void> {
     await db.delete(users).where(eq(users.id, id));
+  }
+
+  // --- ✅ NUEVO: LOGS IMPLEMENTATION ---
+  async createLog(insertLog: InsertLog): Promise<Log> {
+    const [newLog] = await db.insert(logs).values(insertLog).returning();
+    return newLog;
+  }
+
+  async getRecentLogs(inventoryLocation?: string, limit = 10): Promise<LogWithUser[]> {
+    // Esta consulta trae los movimientos y adjunta los datos del usuario responsable
+    return await db.query.logs.findMany({
+      limit: limit,
+      orderBy: desc(logs.timestamp),
+      with: {
+        user: true // Gracias a la relación que pusimos en schema.ts
+      },
+      // Si quieres filtrar por sede para que cada sede solo vea sus movimientos:
+      where: inventoryLocation 
+        ? eq(users.inventoryLocation, inventoryLocation) 
+        : undefined
+    }) as LogWithUser[];
   }
 }
 
