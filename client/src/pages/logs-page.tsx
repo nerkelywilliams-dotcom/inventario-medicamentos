@@ -18,7 +18,7 @@ export default function LogsPage() {
     (log.details || "").toLowerCase().includes(search.toLowerCase())
   );
 
-  // ✅ FUNCIÓN: Generar el reporte PDF
+  // ✅ FUNCIÓN MEJORADA: Generar el reporte PDF con Diseño Profesional
   const exportToPDF = () => {
     const doc = new jsPDF();
     const tableColumn = ["Acción", "Medicamento", "Detalle", "Responsable", "Fecha"];
@@ -35,19 +35,69 @@ export default function LogsPage() {
       tableRows.push(logData);
     });
 
-    doc.text("Reporte de Movimientos - Sede Magdaleno", 14, 15);
+    // --- DISEÑO DE ENCABEZADO INSTITUCIONAL ---
+    // Rectángulo decorativo superior (Azul Corporativo #2b4cc4)
+    doc.setFillColor(43, 76, 196);
+    doc.rect(0, 0, 210, 40, 'F');
+
+    // Título Principal
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(22);
+    doc.setFont("helvetica", "bold");
+    doc.text("Sede Magdaleno", 14, 20);
+    
+    // Subtítulo
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "normal");
+    doc.text("Sistema de Gestión de Inventario Farmacéutico", 14, 28);
+
+    // Información del Reporte (Derecha)
     doc.setFontSize(10);
-    doc.text(`Generado el: ${format(new Date(), 'dd/MM/yyyy HH:mm')}`, 14, 22);
+    doc.text(`Fecha: ${format(new Date(), 'dd/MM/yyyy')}`, 160, 20);
+    doc.text(`Hora: ${format(new Date(), 'HH:mm')}`, 160, 26);
+
+    // --- CUERPO ---
+    doc.setTextColor(26, 43, 75); // Color oscuro #1a2b4b
+    doc.setFontSize(14);
+    doc.setFont("helvetica", "bold");
+    doc.text("REPORTE DETALLADO DE MOVIMIENTOS", 14, 50);
 
     autoTable(doc, {
       head: [tableColumn],
       body: tableRows,
-      startY: 30,
-      theme: 'grid',
-      headStyles: { fillColor: [43, 76, 196] } // Color azul corporativo #2b4cc4
+      startY: 55,
+      theme: 'striped',
+      headStyles: { 
+        fillColor: [43, 76, 196], 
+        textColor: [255, 255, 255],
+        fontStyle: 'bold',
+        halign: 'center'
+      },
+      bodyStyles: { 
+        textColor: [51, 51, 51],
+        fontSize: 9 
+      },
+      alternateRowStyles: { 
+        fillColor: [245, 247, 255] 
+      },
+      margin: { top: 55 }
     });
 
-    doc.save(`bitacora_sede_magdaleno_${format(new Date(), 'yyyyMMdd')}.pdf`);
+    // --- PIE DE PÁGINA ---
+    const pageCount = (doc as any).internal.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.setFontSize(8);
+      doc.setTextColor(150);
+      doc.text(
+        `Página ${i} de ${pageCount} - Documento generado automáticamente por el Sistema de Inventario`,
+        105, 
+        285, 
+        { align: "center" }
+      );
+    }
+
+    doc.save(`bitacora_magdaleno_${format(new Date(), 'yyyyMMdd_HHmm')}.pdf`);
   };
 
   return (
@@ -67,7 +117,7 @@ export default function LogsPage() {
           </div>
 
           <div className="flex flex-col sm:flex-row items-center gap-3">
-            {/* ✅ BOTÓN DE EXPORTACIÓN AÑADIDO */}
+            {/* ✅ BOTÓN DE EXPORTACIÓN CON MEJORAS */}
             <button 
               onClick={exportToPDF}
               disabled={!filteredLogs || filteredLogs.length === 0}
