@@ -7,8 +7,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Loader2, PlusCircle, X, Pill, Activity, AlertOctagon, RefreshCw } from "lucide-react";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
+import { Switch } from "@/components/ui/switch"; // ✅ Importación necesaria
+import { Loader2, PlusCircle, X, Pill, Activity, AlertOctagon, RefreshCw, Baby } from "lucide-react"; // ✅ Añadido Baby icon
 import { z } from "zod";
 
 interface MedicationFormProps {
@@ -26,6 +27,7 @@ const formSchema = insertMedicationSchema.extend({
   familyId: z.coerce.number().optional(),
   expirationDate: z.coerce.string().min(1, "La fecha de vencimiento es requerida"),
   dose: z.string().min(1, "La dosis es vital para la seguridad del paciente"), 
+  isPediatric: z.boolean().default(false), // ✅ Validado en el esquema
   imageUrl: z.union([
     z.instanceof(File),
     z.string(),
@@ -52,6 +54,7 @@ export function MedicationForm({ defaultValues, onSubmit, isLoading, submitLabel
       administrationRoute: "",
       contraindications: "",
       interactions: "",
+      isPediatric: false, // ✅ Valor inicial
       ...defaultValues,
       expirationDate: defaultValues?.expirationDate 
         ? new Date(defaultValues.expirationDate).toISOString().split('T')[0]
@@ -87,7 +90,7 @@ export function MedicationForm({ defaultValues, onSubmit, isLoading, submitLabel
             name="name"
             render={({ field }) => (
               <FormItem className="md:col-span-2">
-                <FormLabel className="flex items-center gap-2">
+                <FormLabel className="flex items-center gap-2 text-base font-bold text-[#1a2b4b]">
                   <Pill className="h-4 w-4 text-primary" /> Nombre Comercial
                 </FormLabel>
                 <FormControl>
@@ -114,6 +117,31 @@ export function MedicationForm({ defaultValues, onSubmit, isLoading, submitLabel
             )}
           />
 
+          {/* ✅ NUEVO CAMPO: USO PEDIÁTRICO (Ubicado estratégicamente) */}
+          <FormField
+            control={form.control}
+            name="isPediatric"
+            render={({ field }) => (
+              <FormItem className="flex flex-row items-center justify-between rounded-xl border-2 border-sky-100 p-4 bg-sky-50/50 shadow-sm transition-all hover:bg-white md:col-span-1">
+                <div className="space-y-0.5">
+                  <FormLabel className="text-sm font-black text-sky-900 flex items-center gap-2">
+                    <Baby className="h-4 w-4 text-sky-500" /> ¿ES PEDIÁTRICO?
+                  </FormLabel>
+                  <FormDescription className="text-[10px] leading-tight text-sky-600/80 font-medium">
+                    Marcar solo si es para uso infantil.
+                  </FormDescription>
+                </div>
+                <FormControl>
+                  <Switch
+                    checked={field.value}
+                    onCheckedChange={field.onChange}
+                    className="data-[state=checked]:bg-sky-500"
+                  />
+                </FormControl>
+              </FormItem>
+            )}
+          />
+
           <FormField
             control={form.control}
             name="presentation"
@@ -123,7 +151,6 @@ export function MedicationForm({ defaultValues, onSubmit, isLoading, submitLabel
                 {isCustomPresentation ? (
                   <div className="flex gap-2">
                     <FormControl>
-                      {/* FIX: Aseguramos que el valor nunca sea null */}
                       <Input {...field} value={field.value ?? ""} autoFocus />
                     </FormControl>
                     <Button type="button" variant="ghost" size="icon" onClick={() => setIsCustomPresentation(false)}><X className="h-4 w-4" /></Button>
@@ -192,8 +219,6 @@ export function MedicationForm({ defaultValues, onSubmit, isLoading, submitLabel
           <h3 className="font-bold text-lg flex items-center gap-2 text-muted-foreground">
             📚 Ficha Farmacológica
           </h3>
-          
-          
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <FormField
@@ -205,13 +230,11 @@ export function MedicationForm({ defaultValues, onSubmit, isLoading, submitLabel
                   {isCustomVia ? (
                     <div className="flex gap-2">
                       <FormControl>
-                        {/* FIX: El error 2322 se soluciona con value={field.value ?? ""} */}
                         <Input {...field} value={field.value ?? ""} autoFocus />
                       </FormControl>
                       <Button type="button" variant="ghost" size="icon" onClick={() => setIsCustomVia(false)}><X className="h-4 w-4" /></Button>
                     </div>
                   ) : (
-                    /* FIX: El error del Select se soluciona usando value en vez de defaultValue para mayor control */
                     <Select 
                       onValueChange={(val) => val === "OTHER" ? setIsCustomVia(true) : field.onChange(val)} 
                       value={field.value ?? undefined}
@@ -246,7 +269,6 @@ export function MedicationForm({ defaultValues, onSubmit, isLoading, submitLabel
             />
           </div>
 
-          {/* ... resto del código con los textareas que ya habías corregido ... */}
           <div className="space-y-4">
             <FormField
               control={form.control}
