@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, timestamp, boolean } from "drizzle-orm/pg-core"; // ✅ Añadido boolean
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { relations } from "drizzle-orm";
@@ -30,6 +30,7 @@ export const medications = pgTable("medications", {
   contraindications: text("contraindications").notNull().default("No especificadas"),
   interactions: text("interactions").notNull().default("No especificadas"),
   inventoryLocation: text("inventory_location").notNull().default("maracay"),
+  isPediatric: boolean("is_pediatric").notNull().default(false), // ✅ NUEVA COLUMNA: Identificador pediátrico
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -43,13 +44,12 @@ export const users = pgTable("users", {
 });
 
 // --- TABLA DE BITÁCORA (LOGS) ---
-// Registra quién hizo qué, cuándo y con qué medicamento
 export const logs = pgTable("logs", {
   id: serial("id").primaryKey(),
-  userId: integer("user_id").references(() => users.id), // Relación con el usuario
-  action: text("action").notNull(), // INGRESO, SALIDA, ACTUALIZACIÓN, ELIMINACIÓN
-  medicationName: text("medication_name").notNull(), // Guardamos el nombre como texto por si se borra el original
-  details: text("details"), // Ej: "Stock actualizado de 10 a 50"
+  userId: integer("user_id").references(() => users.id), 
+  action: text("action").notNull(), 
+  medicationName: text("medication_name").notNull(), 
+  details: text("details"), 
   timestamp: timestamp("timestamp").defaultNow().notNull(),
 });
 
@@ -67,7 +67,7 @@ export const medicationsRelations = relations(medications, ({ one }) => ({
   }),
 }));
 
-// 2. Relación Usuarios <-> Logs (Para saber quién es el responsable)
+// 2. Relación Usuarios <-> Logs
 export const usersRelations = relations(users, ({ many }) => ({
   logs: many(logs),
 }));
@@ -129,7 +129,6 @@ export type InsertUser = z.infer<typeof insertUserSchema>;
 // Logs
 export type Log = typeof logs.$inferSelect;
 export type InsertLog = z.infer<typeof insertLogSchema>;
-// Tipo compuesto para mostrar el nombre del usuario en el Dashboard
 export type LogWithUser = Log & {
   user: User; 
 };

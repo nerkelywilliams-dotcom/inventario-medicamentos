@@ -11,10 +11,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { MedicationForm } from "@/components/MedicationForm";
 import { MedicationDetail } from "@/components/MedicationDetail";
 import { ExpiryBadge, StockBadge } from "@/components/StatusBadges";
-import { Search, Plus, FileDown, Eye, Pencil, Trash2, FilterX, Tag } from "lucide-react";
+import { Search, Plus, FileDown, Eye, Pencil, Trash2, FilterX, Tag, Baby } from "lucide-react"; // ✅ Añadido Baby icon
 import { format } from "date-fns";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
+import { Badge } from "@/components/ui/badge"; // ✅ Añadido Badge
 
 export default function Inventory() {
   const { isAdmin, user } = useAuth();
@@ -35,11 +36,25 @@ export default function Inventory() {
   const deleteMutation = useDeleteMedication();
   const { toast } = useToast();
 
+  // ✅ FILTRADO MEJORADO: Ahora permite buscar por la palabra "pediatrico"
+  const filteredMedications = medications?.filter(med => {
+    const searchTerm = search.toLowerCase();
+    const matchesText = med.name.toLowerCase().includes(searchTerm) || 
+                       med.presentation.toLowerCase().includes(searchTerm);
+    
+    const matchesPediatricTag = (searchTerm.includes("pediat") || searchTerm.includes("niño")) 
+      ? med.isPediatric 
+      : false;
+
+    return matchesText || matchesPediatricTag;
+  });
+
   const handleExport = () => {
     if (!medications) return;
     const data = medications.map(m => ({
       Nombre: m.name,
       Dosis: m.dose,
+      Pediátrico: m.isPediatric ? "Sí" : "No", // ✅ Añadido al Excel
       Familia: m.family?.name || "No asignada",
       Presentacion: m.presentation,
       Cantidad: m.quantity,
@@ -103,7 +118,7 @@ export default function Inventory() {
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input 
-            placeholder="Buscar por nombre o principio activo..." 
+            placeholder="Buscar por nombre, principio o escriba 'pediatrico'..." 
             className="pl-9 border-none bg-muted/50 focus-visible:ring-1 focus-visible:ring-primary/20"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -151,20 +166,26 @@ export default function Inventory() {
                   <TableCell><Skeleton className="h-8 w-24 ml-auto" /></TableCell>
                 </TableRow>
               ))
-            ) : medications?.length === 0 ? (
+            ) : filteredMedications?.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={5} className="h-48 text-center text-muted-foreground">
                   No se encontraron medicamentos registrados en esta sede.
                 </TableCell>
               </TableRow>
             ) : (
-              medications?.map((med) => (
+              filteredMedications?.map((med) => (
                 <TableRow key={med.id} className="group hover:bg-primary/5 transition-colors">
                   <TableCell>
                     <div>
-                      <div className="font-semibold text-foreground group-hover:text-primary transition-colors flex items-center gap-1">
+                      <div className="font-semibold text-foreground group-hover:text-primary transition-colors flex items-center gap-2">
                         {med.name} 
                         <span className="text-muted-foreground font-normal">({med.dose})</span>
+                        {/* ✅ BADGE PEDIÁTRICO AÑADIDO */}
+                        {med.isPediatric && (
+                          <Badge className="bg-sky-100 text-sky-700 hover:bg-sky-100 border-sky-200 text-[10px] font-black uppercase px-2 py-0 h-5 flex items-center gap-0.5">
+                            <Baby className="h-2.5 w-2.5" /> Pediátrico
+                          </Badge>
+                        )}
                       </div>
                       <div className="text-xs text-muted-foreground italic">{med.presentation}</div>
                     </div>
