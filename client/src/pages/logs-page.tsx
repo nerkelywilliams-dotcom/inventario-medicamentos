@@ -1,20 +1,54 @@
 import { useState } from "react";
 import { useLogs } from "@/hooks/use-logs";
 import { Link } from "wouter";
-import { ArrowLeft, Search, ArrowDownLeft, ArrowUpRight, FileEdit } from "lucide-react";
+import { ArrowLeft, Search, ArrowDownLeft, ArrowUpRight, FileEdit, Download } from "lucide-react"; // ✅ Añadido Download
 import { format, isValid } from "date-fns";
 import { es } from "date-fns/locale";
+import jsPDF from "jspdf"; // ✅ Añadido para PDF
+import autoTable from "jspdf-autotable"; // ✅ Añadido para tablas en PDF
 
 export default function LogsPage() {
   const { data: logs, isLoading } = useLogs();
   const [search, setSearch] = useState("");
 
-  // ✅ CORRECCIÓN: Añadimos (log.details || "") para evitar el error de null
+  // ✅ CORRECCIÓN: Filtro con protección de nulidad
   const filteredLogs = logs?.filter(log => 
     log.medicationName.toLowerCase().includes(search.toLowerCase()) ||
     (log.user?.username || "").toLowerCase().includes(search.toLowerCase()) ||
     (log.details || "").toLowerCase().includes(search.toLowerCase())
   );
+
+  // ✅ FUNCIÓN: Generar el reporte PDF
+  const exportToPDF = () => {
+    const doc = new jsPDF();
+    const tableColumn = ["Acción", "Medicamento", "Detalle", "Responsable", "Fecha"];
+    const tableRows: any[] = [];
+
+    filteredLogs?.forEach(log => {
+      const logData = [
+        log.action,
+        log.medicationName,
+        log.details || "Sin descripción",
+        log.user?.username || "Sistema",
+        format(new Date(log.timestamp), 'dd/MM/yyyy HH:mm', { locale: es })
+      ];
+      tableRows.push(logData);
+    });
+
+    doc.text("Reporte de Movimientos - Sede Magdaleno", 14, 15);
+    doc.setFontSize(10);
+    doc.text(`Generado el: ${format(new Date(), 'dd/MM/yyyy HH:mm')}`, 14, 22);
+
+    autoTable(doc, {
+      head: [tableColumn],
+      body: tableRows,
+      startY: 30,
+      theme: 'grid',
+      headStyles: { fillColor: [43, 76, 196] } // Color azul corporativo #2b4cc4
+    });
+
+    doc.save(`bitacora_sede_magdaleno_${format(new Date(), 'yyyyMMdd')}.pdf`);
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 p-4 md:p-8">
@@ -32,17 +66,28 @@ export default function LogsPage() {
             <p className="text-slate-500 font-medium">Registro detallado de todas las transacciones</p>
           </div>
 
-          <div className="relative w-full md:w-96">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Search className="h-5 w-5 text-slate-400" />
+          <div className="flex flex-col sm:flex-row items-center gap-3">
+            {/* ✅ BOTÓN DE EXPORTACIÓN AÑADIDO */}
+            <button 
+              onClick={exportToPDF}
+              disabled={!filteredLogs || filteredLogs.length === 0}
+              className="flex items-center gap-2 bg-white text-[#1a2b4b] px-5 py-3 rounded-xl border border-slate-200 font-bold shadow-sm hover:bg-slate-50 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto justify-center"
+            >
+              <Download className="w-4 h-4 text-[#2b4cc4]" /> Exportar PDF
+            </button>
+
+            <div className="relative w-full md:w-80">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <Search className="h-5 w-5 text-slate-400" />
+              </div>
+              <input
+                type="text"
+                placeholder="Buscar por medicamento, usuario..."
+                className="pl-10 pr-4 py-3 w-full rounded-xl border-slate-200 shadow-sm focus:border-[#2b4cc4] focus:ring-[#2b4cc4] transition-all"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
             </div>
-            <input
-              type="text"
-              placeholder="Buscar por medicamento, usuario..."
-              className="pl-10 pr-4 py-3 w-full rounded-xl border-slate-200 shadow-sm focus:border-[#2b4cc4] focus:ring-[#2b4cc4] transition-all"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
           </div>
         </div>
 
@@ -85,7 +130,6 @@ export default function LogsPage() {
                           {log.medicationName}
                         </td>
                         <td className="py-4 text-slate-600 text-sm font-medium">
-                          {/* ✅ También protegemos el renderizado aquí */}
                           {log.details || "Sin descripción"}
                         </td>
                         <td className="py-4">
