@@ -2,7 +2,7 @@ import { useLogs } from "@/hooks/use-logs";
 import { useMedications } from "@/hooks/use-medications";
 import { Pill, AlertCircle, AlertTriangle, Clock, ArrowDownLeft, ArrowUpRight, FileEdit, History, RefreshCw } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
-import { differenceInDays, isAfter, format } from "date-fns";
+import { differenceInDays, isAfter, format, isValid } from "date-fns";
 import { es } from "date-fns/locale";
 
 export default function Dashboard() {
@@ -136,7 +136,12 @@ export default function Dashboard() {
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
-                    {logs?.map((log) => (
+                    {logs?.map((log) => {
+                      // Validación de seguridad para la fecha
+                      const dateObj = new Date(log.timestamp);
+                      const isDateValid = isValid(dateObj);
+
+                      return (
                         <tr key={log.id} className="group hover:bg-slate-50 transition-colors">
                             <td className="py-4 pl-4">
                                 <div className={`w-10 h-10 rounded-xl flex items-center justify-center 
@@ -156,23 +161,26 @@ export default function Dashboard() {
                             </td>
                             <td className="py-4">
                                 <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 text-xs font-bold">
-                                    {log.user.username}
+                                    {log.user?.username || 'Sistema'}
                                 </span>
                             </td>
                             <td className="py-4 text-right pr-4">
                                 <p className="text-sm font-bold text-slate-600">
-                                  {format(new Date(log.timestamp), 'dd MMM', { locale: es })}
+                                  {isDateValid ? format(dateObj, 'dd MMM', { locale: es }) : '---'}
                                 </p>
                                 <p className="text-[10px] font-medium text-slate-400">
-                                  {format(new Date(log.timestamp), 'HH:mm')}
+                                  {isDateValid ? format(dateObj, 'HH:mm') : '--:--'}
                                 </p>
                             </td>
                         </tr>
-                    ))}
-                    {logs?.length === 0 && (
+                      );
+                    })}
+                    
+                    {/* Mensaje si no hay datos */}
+                    {(!logs || logs.length === 0) && (
                       <tr>
                         <td colSpan={4} className="py-10 text-center text-slate-400 font-bold italic">
-                          No se han registrado movimientos todavía.
+                          {isLoadingLogs ? 'Cargando bitácora...' : 'No se han registrado movimientos todavía.'}
                         </td>
                       </tr>
                     )}
