@@ -12,7 +12,8 @@ import Inventory from "@/pages/Inventory";
 import Families from "@/pages/Families";
 import Users from "@/pages/Users";
 import Login from "@/pages/Login";
-import Settings from "@/pages/Settings"; // <--- Importación añadida
+import Settings from "@/pages/Settings";
+import LogsPage from "@/pages/logs-page"; // ✅ Nueva importación añadida
 
 type UserRole = 'admin' | 'viewer';
 
@@ -73,7 +74,8 @@ function Router() {
           <Switch>
             <Route path="/" component={Dashboard} />
             <Route path="/inventory" component={Inventory} />
-            <Route path="/settings" component={Settings} /> {/* <--- Ruta de Configuración añadida */}
+            <Route path="/settings" component={Settings} />
+            <Route path="/bitacora" component={LogsPage} /> {/* ✅ Ruta de Bitácora añadida */}
             
             <Route path="/families">
               {user.role === 'admin' ? <Families /> : <NotFound />}

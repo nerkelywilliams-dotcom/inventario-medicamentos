@@ -1,5 +1,6 @@
 import { useLogs } from "@/hooks/use-logs";
 import { useMedications } from "@/hooks/use-medications";
+import { Link } from "wouter"; // ✅ Importación añadida
 import { Pill, AlertCircle, AlertTriangle, Clock, ArrowDownLeft, ArrowUpRight, FileEdit, History, RefreshCw } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 import { differenceInDays, isAfter, format, isValid } from "date-fns";
@@ -122,7 +123,16 @@ export default function Dashboard() {
                     <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Últimos cambios registrados</p>
                 </div>
             </div>
-            {isLoadingLogs && <RefreshCw className="h-4 w-4 animate-spin text-slate-400" />}
+            
+            {/* ✅ CONTENEDOR DE ACCIÓN: Botón "Ver todo" y Spinner de carga */}
+            <div className="flex items-center gap-4">
+                {isLoadingLogs && <RefreshCw className="h-4 w-4 animate-spin text-slate-400" />}
+                <Link href="/bitacora">
+                    <a className="text-sm font-bold text-[#2b4cc4] hover:text-[#1a2b4b] hover:underline transition-colors flex items-center gap-1 cursor-pointer">
+                        Ver todo <ArrowUpRight className="w-3 h-3" />
+                    </a>
+                </Link>
+            </div>
         </div>
 
         <div className="overflow-x-auto">
@@ -136,8 +146,7 @@ export default function Dashboard() {
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
-                    {logs?.map((log) => {
-                      // Validación de seguridad para la fecha
+                    {logs?.slice(0, 5).map((log) => { // Limitamos a 5 para el Dashboard
                       const dateObj = new Date(log.timestamp);
                       const isDateValid = isValid(dateObj);
 
