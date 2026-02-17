@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, timestamp, boolean } from "drizzle-orm/pg-core"; // ✅ Añadido boolean
+import { pgTable, text, serial, integer, timestamp, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { relations } from "drizzle-orm";
@@ -22,6 +22,7 @@ export const medications = pgTable("medications", {
   quantity: integer("quantity").notNull().default(0),
   expirationDate: timestamp("expiration_date").notNull(),
   imageUrl: text("image_url"),
+  // Detalles farmacológicos
   mechanismOfAction: text("mechanism_of_action"),
   indications: text("indications"),
   posology: text("posology"),
@@ -29,8 +30,9 @@ export const medications = pgTable("medications", {
   // Ficha Farmacológica Extendida
   contraindications: text("contraindications").notNull().default("No especificadas"),
   interactions: text("interactions").notNull().default("No especificadas"),
+  // Control de Inventario y Tipo
   inventoryLocation: text("inventory_location").notNull().default("maracay"),
-  isPediatric: boolean("is_pediatric").notNull().default(false), // ✅ NUEVA COLUMNA: Identificador pediátrico
+  isPediatric: boolean("is_pediatric").notNull().default(false), // ✅ CAMPO PEDIÁTRICO
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -53,7 +55,7 @@ export const logs = pgTable("logs", {
   timestamp: timestamp("timestamp").defaultNow().notNull(),
 });
 
-// --- RELACIONES (Drizzle Queries) ---
+// --- RELACIONES (Drizzle Relations) ---
 
 // 1. Relación Familias <-> Medicamentos
 export const familiesRelations = relations(families, ({ many }) => ({
@@ -88,6 +90,7 @@ export const insertFamilySchema = createInsertSchema(families).omit({
 });
 
 // Medicamentos
+// Nota: isPediatric es opcional en el insert porque tiene default(false)
 export const insertMedicationSchema = createInsertSchema(medications).omit({ 
   id: true, 
   createdAt: true, 
@@ -103,13 +106,13 @@ export const insertLogSchema = createInsertSchema(logs).omit({
   timestamp: true 
 });
 
-// Login Manual
+// Login Manual (Validación de formulario)
 export const loginSchema = z.object({
   username: z.string().min(1, 'El usuario es requerido'),
   password: z.string().min(1, 'La contraseña es requerida'),
 });
 
-// --- TIPOS EXPORTADOS ---
+// --- TIPOS EXPORTADOS (TYPESCRIPT) ---
 
 // Familias
 export type Family = typeof families.$inferSelect;
