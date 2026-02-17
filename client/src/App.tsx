@@ -66,8 +66,8 @@ function Router() {
       <Sidebar>
         <SidebarHeader>
           <div className="flex items-center gap-3 px-2">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#2b4cc4] text-white shadow-lg">
-              <span className="text-xl font-bold">M</span>
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white shadow-lg overflow-hidden border border-slate-200">
+              <img src="/image.png" alt="Logo Magdaleno" className="h-full w-full object-contain" />
             </div>
             <div className="flex flex-col">
               <span className="text-sm font-bold leading-none">MediStock</span>
