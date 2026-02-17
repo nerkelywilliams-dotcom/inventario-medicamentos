@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 // ✅ CORRECCIÓN: Separamos las rutas de los esquemas de datos
 import { api, buildUrl } from "@shared/routes";
-import { type InsertMedication } from "@shared/schema"; 
+import { type InsertMedicationFull, type InsertMedication } from "@shared/schema"; 
 import { useAuth } from "@/context/AuthContext";
 import { z } from "zod";
 
@@ -66,7 +66,7 @@ export function useCreateMedication() {
   const { user } = useAuth();
   
   return useMutation({
-    mutationFn: async (data: InsertMedication) => {
+    mutationFn: async (data: InsertMedicationFull) => {
       const payload = {
         ...data,
         expirationDate: data.expirationDate ? new Date(data.expirationDate) : null,

@@ -1,19 +1,21 @@
 import { db } from "./db";
 import {
-  families, medications, users, logs,
+  families, medications, medicationCatalog, users, logs,
   type Family, type InsertFamily,
-  type Medication, type InsertMedication,
+  type Medication, type InsertMedication, type MedicationCatalog, type InsertMedicationCatalog,
   type User, type InsertUser,
-  type Log, type InsertLog, type LogWithUser
+  type Log, type InsertLog, type LogWithUser, type MedicationWithCatalogAndFamily
 } from "@shared/schema";
 import { eq, ilike, and, desc } from "drizzle-orm";
 
-// Tipo compuesto para inventario
-export type MedicationWithFamily = Medication & {
-  family?: Family;
-};
+// Tipo compuesto para inventario con catálogo
+export type MedicationWithFamily = MedicationWithCatalogAndFamily;
 
 export interface IStorage {
+  // Medication Catalog
+  getMedicationCatalogByName(name: string): Promise<MedicationCatalog | undefined>;
+  createMedicationCatalog(catalog: InsertMedicationCatalog): Promise<MedicationCatalog>;
+
   // Families
   getFamilies(inventoryLocation?: string): Promise<Family[]>;
   getFamily(id: number): Promise<Family | undefined>;
@@ -24,7 +26,7 @@ export interface IStorage {
   // Medications
   getMedications(search?: string, familyId?: string, inventoryLocation?: string): Promise<MedicationWithFamily[]>;
   getMedication(id: number): Promise<MedicationWithFamily | undefined>;
-  createMedication(medication: InsertMedication & { inventoryLocation: string }): Promise<Medication>;
+  createMedication(medication: InsertMedication & { inventoryLocation: string }, catalogId: number): Promise<Medication>;
   updateMedication(id: number, medication: Partial<InsertMedication>): Promise<Medication | undefined>;
   deleteMedication(id: number): Promise<void>;
 
@@ -34,13 +36,22 @@ export interface IStorage {
   createUser(user: InsertUser & { inventoryLocation: string }): Promise<User>;
   deleteUser(id: number): Promise<void>;
 
-  // ✅ NUEVO: Logs (Bitácora)
+  // ✅ Logs (Bitácora)
   createLog(log: InsertLog): Promise<Log>;
   getRecentLogs(inventoryLocation?: string, limit?: number): Promise<LogWithUser[]>;
 }
 
 export class DatabaseStorage implements IStorage {
-  // --- FAMILIES ---
+  // --- MEDICATION CATALOG ---
+  async getMedicationCatalogByName(name: string): Promise<MedicationCatalog | undefined> {
+    const [catalog] = await db.select().from(medicationCatalog).where(eq(medicationCatalog.name, name));
+    return catalog;
+  }
+
+  async createMedicationCatalog(insertCatalog: InsertMedicationCatalog): Promise<MedicationCatalog> {
+    const [catalog] = await db.insert(medicationCatalog).values(insertCatalog).returning();
+    return catalog;
+  }
   async getFamilies(inventoryLocation?: string): Promise<Family[]> {
     if (inventoryLocation) {
       return await db.select().from(families).where(eq(families.inventoryLocation, inventoryLocation));
@@ -74,26 +85,44 @@ export class DatabaseStorage implements IStorage {
   // --- MEDICATIONS ---
   async getMedications(search?: string, familyId?: string, inventoryLocation?: string): Promise<MedicationWithFamily[]> {
     const conditions = [];
-    if (search) conditions.push(ilike(medications.name, `%${search}%`));
+    
+    // Si hay búsqueda, buscar tanto en nombre del catálogo como en otros campos
+    if (search) {
+      // NOTA: ilike en medications se aplicaría sobre el catálogo mediante JOIN
+      // Por ahora, buscaremos en el catálogo
+    }
+    
     if (familyId) conditions.push(eq(medications.familyId, parseInt(familyId)));
     if (inventoryLocation) conditions.push(eq(medications.inventoryLocation, inventoryLocation));
 
-    return await db.query.medications.findMany({
+    const result = await db.query.medications.findMany({
       where: conditions.length > 0 ? and(...conditions) : undefined,
-      with: { family: true },
+      with: { catalog: true, family: true },
       orderBy: desc(medications.createdAt)
     }) as MedicationWithFamily[];
+
+    // Aplicar búsqueda por nombre del catálogo si es necesario
+    if (search) {
+      return result.filter(med => 
+        med.catalog?.name?.toLowerCase().includes(search.toLowerCase())
+      );
+    }
+
+    return result;
   }
 
   async getMedication(id: number): Promise<MedicationWithFamily | undefined> {
     return await db.query.medications.findFirst({
       where: eq(medications.id, id),
-      with: { family: true }
+      with: { catalog: true, family: true }
     }) as MedicationWithFamily | undefined;
   }
 
-  async createMedication(insertMedication: InsertMedication & { inventoryLocation: string }): Promise<Medication> {
-    const [medication] = await db.insert(medications).values(insertMedication).returning();
+  async createMedication(insertMedication: InsertMedication & { inventoryLocation: string }, catalogId: number): Promise<Medication> {
+    const [medication] = await db.insert(medications).values({
+      ...insertMedication,
+      catalogId
+    }).returning();
     return medication;
   }
 

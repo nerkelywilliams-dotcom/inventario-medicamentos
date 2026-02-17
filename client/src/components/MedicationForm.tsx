@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { insertMedicationSchema, type InsertMedication } from "@shared/schema";
+import { insertMedicationFullSchema, type InsertMedicationFull } from "@shared/schema";
 import { useFamilies } from "@/hooks/use-families";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,8 +13,8 @@ import { Loader2, PlusCircle, X, Pill, Activity, AlertOctagon, RefreshCw, Baby }
 import { z } from "zod";
 
 interface MedicationFormProps {
-  defaultValues?: Partial<InsertMedication>;
-  onSubmit: (data: InsertMedication) => Promise<void>;
+  defaultValues?: Partial<InsertMedicationFull>;
+  onSubmit: (data: InsertMedicationFull) => Promise<void>;
   isLoading: boolean;
   submitLabel: string;
 }
@@ -22,18 +22,7 @@ interface MedicationFormProps {
 const PRESENTACIONES = ["Tableta", "Cápsula", "Comprimido", "Suspensión", "Jarabe", "Crema", "Gel", "Ampolla", "Vial"];
 const VIAS_ADMIN = ["Oral", "Tópica", "Intravaginal", "Rectal", "Intravenosa", "Intramuscular", "Subcutánea", "Oftálmica"];
 
-const formSchema = insertMedicationSchema.extend({
-  quantity: z.coerce.number().min(0, "La cantidad no puede ser negativa"),
-  familyId: z.coerce.number().optional(),
-  expirationDate: z.coerce.string().min(1, "La fecha de vencimiento es requerida"),
-  dose: z.string().min(1, "La dosis es vital para la seguridad del paciente"), 
-  isPediatric: z.boolean().default(false), // ✅ Validado en el esquema
-  imageUrl: z.union([
-    z.instanceof(File),
-    z.string(),
-    z.null(),
-  ]).optional(),
-});
+const formSchema = insertMedicationFullSchema;
 
 export function MedicationForm({ defaultValues, onSubmit, isLoading, submitLabel }: MedicationFormProps) {
   const { data: families } = useFamilies();

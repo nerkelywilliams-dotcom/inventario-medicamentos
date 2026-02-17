@@ -2,7 +2,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { type Medication, type Family } from "@shared/schema";
+import { type MedicationWithCatalogAndFamily } from "@shared/schema";
 import { ExpiryBadge, StockBadge } from "./StatusBadges";
 import { 
   FileText, 
@@ -21,11 +21,11 @@ import {
 import { useEffect, useState } from "react";
 
 interface MedicationDetailProps {
-  medication: Medication & { family?: Family };
+  medication: MedicationWithCatalogAndFamily;
   trigger?: React.ReactNode;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
-  fetchFullData?: (id: number) => Promise<Medication & { family?: Family }>;
+  fetchFullData?: (id: number) => Promise<MedicationWithCatalogAndFamily>;
 }
 
 export function MedicationDetail({ 
@@ -41,9 +41,9 @@ export function MedicationDetail({
 
   useEffect(() => {
     if (open && fetchFullData && !hasLoadedFullData) {
-      const needsFullData = !initialMedication.administrationRoute || 
-                            !initialMedication.mechanismOfAction || 
-                            !initialMedication.indications;
+      const needsFullData = !initialMedication.catalog?.administrationRoute || 
+                            !initialMedication.catalog?.mechanismOfAction || 
+                            !initialMedication.catalog?.indications;
       
       if (needsFullData) {
         setIsLoading(true);
@@ -65,14 +65,16 @@ export function MedicationDetail({
 
   const safeMedication = {
     ...medication,
+    name: medication.catalog?.name || "Sin nombre",
     dose: medication.dose || "No especificada",
-    administrationRoute: medication.administrationRoute || "No especificada",
-    mechanismOfAction: medication.mechanismOfAction || "No especificado",
-    indications: medication.indications || "No especificadas",
-    posology: medication.posology || "No especificada",
-    contraindications: medication.contraindications || "Sin contraindicaciones registradas",
-    interactions: medication.interactions || "Sin interacciones registradas",
-    description: medication.description || "Sin descripción adicional",
+    administrationRoute: medication.catalog?.administrationRoute || "No especificada",
+    mechanismOfAction: medication.catalog?.mechanismOfAction || "No especificado",
+    indications: medication.catalog?.indications || "No especificadas",
+    posology: medication.catalog?.posology || "No especificada",
+    contraindications: medication.catalog?.contraindications || "Sin contraindicaciones registradas",
+    interactions: medication.catalog?.interactions || "Sin interacciones registradas",
+    description: medication.catalog?.description || "Sin descripción adicional",
+    imageUrl: medication.catalog?.imageUrl,
   };
 
   const formatExpiryDate = (date: Date | string) => {

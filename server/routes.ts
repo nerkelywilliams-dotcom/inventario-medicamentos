@@ -3,7 +3,7 @@ import type { Server } from "http";
 import { storage } from "./storage";
 import { api } from "@shared/routes";
 import { z } from "zod";
-import { insertMedicationSchema, insertFamilySchema, loginSchema, insertUserSchema, type User } from "@shared/schema";
+import { insertMedicationFullSchema, insertFamilySchema, loginSchema, insertUserSchema, type User } from "@shared/schema";
 
 // Extend Express Request to include user
 declare global {
@@ -214,23 +214,55 @@ export async function registerRoutes(
       const body = {
         ...req.body,
         expirationDate: req.body.expirationDate ? new Date(req.body.expirationDate) : undefined,
-        inventoryLocation: req.user.inventoryLocation
       };
-      const input = insertMedicationSchema.parse(body);
+      const input = insertMedicationFullSchema.parse(body);
+
+      // 1. Verificar si el medicamento ya existe en el catálogo
+      let catalogId = null;
+      const existingCatalog = await storage.getMedicationCatalogByName(input.name);
+      
+      if (existingCatalog) {
+        // El medicamento ya existe en el catálogo, reutilizar su información
+        catalogId = existingCatalog.id;
+      } else {
+        // Crear una nueva entrada en el catálogo con la información científica
+        const catalogEntry = await storage.createMedicationCatalog({
+          name: input.name,
+          description: input.description,
+          imageUrl: input.imageUrl,
+          mechanismOfAction: input.mechanismOfAction,
+          indications: input.indications,
+          posology: input.posology,
+          administrationRoute: input.administrationRoute,
+          contraindications: input.contraindications || "No especificadas",
+          interactions: input.interactions || "No especificadas",
+        });
+        catalogId = catalogEntry.id;
+      }
+
+      // 2. Crear el registro de inventario vinculado al catálogo
       const medication = await storage.createMedication({
-        ...input,
+        dose: input.dose || "Ver empaque",
+        presentation: input.presentation,
+        quantity: input.quantity || 0,
+        expirationDate: input.expirationDate,
+        isPediatric: input.isPediatric || false,
+        familyId: input.familyId || null,
         inventoryLocation: req.user.inventoryLocation
-      });
+      }, catalogId);
+
+      // 3. Obtener el medicamento completo con catálogo para la respuesta
+      const completemedication = await storage.getMedication(medication.id);
 
       // ✅ LOG: Registro de ingreso
       await storage.createLog({
         userId: (req.user as any).id,
         action: "INGRESO",
-        medicationName: medication.name,
-        details: `Registro inicial con ${medication.quantity} unidades.`
+        medicationName: completemedication?.catalog?.name || medication.id.toString(),
+        details: `Registro inicial con ${medication.quantity} unidades. ${existingCatalog ? '(Reutilizado del catálogo)' : '(Nuevo en catálogo)'}`
       });
 
-      res.status(201).json(medication);
+      res.status(201).json(completemedication);
     } catch (err) {
       if (err instanceof z.ZodError) {
         return res.status(400).json({
@@ -252,8 +284,17 @@ export async function registerRoutes(
         ...req.body,
         expirationDate: req.body.expirationDate ? new Date(req.body.expirationDate) : undefined
       };
-      const input = insertMedicationSchema.partial().parse(body);
-      const medication = await storage.updateMedication(id, input);
+      
+      // Solo actualizar los campos del inventario (no los del catálogo)
+      const updateFields: any = {};
+      if (body.dose !== undefined) updateFields.dose = body.dose;
+      if (body.presentation !== undefined) updateFields.presentation = body.presentation;
+      if (body.quantity !== undefined) updateFields.quantity = body.quantity;
+      if (body.expirationDate !== undefined) updateFields.expirationDate = body.expirationDate;
+      if (body.isPediatric !== undefined) updateFields.isPediatric = body.isPediatric;
+      if (body.familyId !== undefined) updateFields.familyId = body.familyId;
+
+      const medication = await storage.updateMedication(id, updateFields);
       
       if (!medication) {
         return res.status(404).json({ message: 'Medication not found' });
@@ -263,20 +304,22 @@ export async function registerRoutes(
       if (oldMed) {
         let action = "ACTUALIZACIÓN";
         let details = "Datos actualizados.";
-        if (input.quantity !== undefined && input.quantity !== oldMed.quantity) {
-          const diff = input.quantity - oldMed.quantity;
+        if (updateFields.quantity !== undefined && updateFields.quantity !== oldMed.quantity) {
+          const diff = updateFields.quantity - oldMed.quantity;
           action = diff > 0 ? "INGRESO" : "SALIDA";
           details = diff > 0 ? `Se sumaron ${diff} unidades.` : `Se retiraron ${Math.abs(diff)} unidades.`;
         }
         await storage.createLog({
           userId: (req.user as any).id,
           action: action,
-          medicationName: medication.name,
+          medicationName: oldMed.catalog?.name || oldMed.id.toString(),
           details: details
         });
       }
 
-      res.json(medication);
+      // Retornar medicamento completo con catálogo
+      const completemedication = await storage.getMedication(id);
+      res.json(completemedication);
     } catch (err) {
       if (err instanceof z.ZodError) {
         return res.status(400).json({
@@ -299,7 +342,7 @@ export async function registerRoutes(
       await storage.createLog({
         userId: (req.user as any).id,
         action: "ELIMINACIÓN",
-        medicationName: med.name,
+        medicationName: med.catalog?.name || med.id.toString(),
         details: "Medicamento eliminado del sistema."
       });
     }
@@ -349,6 +392,51 @@ async function seedDatabase() {
       inventoryLocation: "magdaleno"
     });
 
+    // Create medication catalogs
+    const paracetamolCatalog = await storage.createMedicationCatalog({
+      name: "Paracetamol",
+      description: "Analgésico y antipirético eficaz para el control del dolor leve a moderado y la fiebre.",
+      mechanismOfAction: "Inhibe la síntesis de prostaglandinas en el sistema nervioso central.",
+      indications: "Dolor leve a moderado, fiebre.",
+      posology: "Adultos: 500 mg - 1 g cada 4-6 horas.",
+      administrationRoute: "Oral",
+      contraindications: "Hipersensibilidad, insuficiencia hepática grave.",
+      interactions: "Alcohol, anticoagulantes orales."
+    });
+
+    const amoxicilinaCatalog = await storage.createMedicationCatalog({
+      name: "Amoxicilina",
+      description: "Antibiótico de amplio espectro.",
+      mechanismOfAction: "Inhibe la síntesis de la pared celular bacteriana.",
+      indications: "Infecciones respiratorias, de piel, urinarias.",
+      posology: "500 mg cada 8 horas.",
+      administrationRoute: "Oral",
+      contraindications: "Alergia a penicilinas.",
+      interactions: "Anticonceptivos orales, alopurinol."
+    });
+
+    const dipironaCatalog = await storage.createMedicationCatalog({
+      name: "Dipirona",
+      description: "Analgésico y antipirético potente.",
+      mechanismOfAction: "Inhibe la síntesis de prostaglandinas.",
+      indications: "Dolor moderado a severo, fiebre.",
+      posology: "Adultos: 500 mg - 1g cada 4-6 horas.",
+      administrationRoute: "Oral",
+      contraindications: "Hipersensibilidad, agranulocitosis.",
+      interactions: "Ciclosporina."
+    });
+
+    const diclofenacoCatalog = await storage.createMedicationCatalog({
+      name: "Diclofenaco",
+      description: "AINE para reducción de inflamación.",
+      mechanismOfAction: "Inhibición de prostaglandinas.",
+      indications: "Inflamación, dolor articular.",
+      posology: "50-100 mg cada 8-12 horas.",
+      administrationRoute: "Oral",
+      contraindications: "Úlcera péptica activa.",
+      interactions: "Litio, digoxina."
+    });
+
     // Seed medications for Maracay
     const today = new Date();
     const nextMonth = new Date(today); nextMonth.setMonth(today.getMonth() + 1);
@@ -356,68 +444,44 @@ async function seedDatabase() {
 
     await storage.createMedication({
       familyId: analgesicsMy.id,
-      name: "Paracetamol",
       presentation: "Tabletas 500mg",
       quantity: 100,
       expirationDate: nextYear,
-      description: "Analgésico y antipirético eficaz para el control del dolor leve a moderado y la fiebre.",
-      mechanismOfAction: "Inhibe la síntesis de prostaglandinas en el sistema nervioso central.",
-      indications: "Dolor leve a moderado, fiebre.",
-      posology: "Adultos: 500 mg - 1 g cada 4-6 horas.",
-      administrationRoute: "Oral",
-      inventoryLocation: "maracay",
-      contraindications: "Hipersensibilidad, insuficiencia hepática grave.",
-      interactions: "Alcohol, anticoagulantes orales."
-    });
+      isPediatric: false,
+      dose: "500mg",
+      inventoryLocation: "maracay"
+    }, paracetamolCatalog.id);
 
     await storage.createMedication({
       familyId: antibioticsMy.id,
-      name: "Amoxicilina",
       presentation: "Cápsulas 500mg",
       quantity: 5,
       expirationDate: nextMonth,
-      description: "Antibiótico de amplio espectro.",
-      mechanismOfAction: "Inhibe la síntesis de la pared celular bacteriana.",
-      indications: "Infecciones respiratorias, de piel, urinarias.",
-      posology: "500 mg cada 8 horas.",
-      administrationRoute: "Oral",
-      inventoryLocation: "maracay",
-      contraindications: "Alergia a penicilinas.",
-      interactions: "Anticonceptivos orales, alopurinol."
-    });
+      isPediatric: false,
+      dose: "500mg",
+      inventoryLocation: "maracay"
+    }, amoxicilinaCatalog.id);
 
     // Seed medications for Magdaleno
     await storage.createMedication({
       familyId: analgesicsMd.id,
-      name: "Dipirona",
       presentation: "Tabletas 500mg",
       quantity: 80,
       expirationDate: nextYear,
-      description: "Analgésico y antipirético potente.",
-      mechanismOfAction: "Inhibe la síntesis de prostaglandinas.",
-      indications: "Dolor moderado a severo, fiebre.",
-      posology: "Adultos: 500 mg - 1g cada 4-6 horas.",
-      administrationRoute: "Oral",
-      inventoryLocation: "magdaleno",
-      contraindications: "Hipersensibilidad, agranulocitosis.",
-      interactions: "Ciclosporina."
-    });
+      isPediatric: false,
+      dose: "500mg",
+      inventoryLocation: "magdaleno"
+    }, dipironaCatalog.id);
 
     await storage.createMedication({
       familyId: antiinflamMd.id,
-      name: "Diclofenaco",
       presentation: "Tabletas 50mg",
       quantity: 60,
       expirationDate: nextMonth,
-      description: "AINE para reducción de inflamación.",
-      mechanismOfAction: "Inhibición de prostaglandinas.",
-      indications: "Inflamación, dolor articular.",
-      posology: "50-100 mg cada 8-12 horas.",
-      administrationRoute: "Oral",
-      inventoryLocation: "magdaleno",
-      contraindications: "Úlcera péptica activa.",
-      interactions: "Litio, digoxina."
-    });
+      isPediatric: false,
+      dose: "50mg",
+      inventoryLocation: "magdaleno"
+    }, diclofenacoCatalog.id);
   }
 
   // Seed users

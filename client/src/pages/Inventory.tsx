@@ -50,7 +50,7 @@ export default function Inventory() {
       str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
     const term = normalize(search);
-    const name = normalize(med.name);
+    const name = normalize(med.catalog?.name || "");
     const presentation = normalize(med.presentation);
 
     if (isUrlPediatricFilter) {
@@ -73,7 +73,7 @@ export default function Inventory() {
   const handleExport = () => {
     if (!medications) return;
     const data = medications.map(m => ({
-      Nombre: m.name,
+      Nombre: m.catalog?.name || "Sin nombre",
       Dosis: m.dose,
       Pediátrico: m.isPediatric ? "Sí" : "No",
       Familia: m.family?.name || "No asignada",
@@ -91,14 +91,14 @@ export default function Inventory() {
 
   const handleDelete = async (id: number) => {
     const medicationToDelete = medications?.find(m => m.id === id);
-    if (window.confirm(`¿Estás seguro de eliminar ${medicationToDelete?.name}? Esta acción no se puede deshacer.`)) {
+    if (window.confirm(`¿Estás seguro de eliminar ${medicationToDelete?.catalog?.name}? Esta acción no se puede deshacer.`)) {
       await deleteMutation.mutateAsync(id);
       
       // ✅ REGISTRO EN BITÁCORA (Eliminación)
       if (user) {
         createLog.mutate({
           action: "ELIMINAR",
-          details: `Se eliminó el medicamento: ${medicationToDelete?.name || id}`,
+          details: `Se eliminó el medicamento: ${medicationToDelete?.catalog?.name || id}`,
           userId: user.id
         });
       }
@@ -241,7 +241,7 @@ export default function Inventory() {
                   <TableCell>
                     <div>
                       <div className="font-semibold text-foreground group-hover:text-primary transition-colors flex items-center gap-2">
-                        {med.name} 
+                        {med.catalog?.name} 
                         <span className="text-muted-foreground font-normal">({med.dose})</span>
                         
                         {med.isPediatric && (
