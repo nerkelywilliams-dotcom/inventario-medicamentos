@@ -31,16 +31,53 @@ NODE_ENV = production
 
 **La DATABASE_URL debe ser la URL interna de tu base de datos PostgreSQL**
 
-### 4. **Verificar Logs**
+### 3.1. **¿Qué sucede durante el deploy?**
+
+El comando `npm start` ejecuta automáticamente:
+
+1. **`npx drizzle-kit push`** - Crea las tablas (migrations)
+2. **`tsx scripts/init-db.ts`** - Inicializa datos de prueba:
+   - Crea 2 familias farmacológicas por ubicación (maracay, magdaleno)
+   - Crea 4 medicamentos en el catálogo
+   - Crea 4 usuarios (2 admins y 2 viewers, uno por ubicación)
+3. **`node dist/index.js`** - Inicia el servidor
+
+**Por lo tanto, después del primer deploy:**
+- ✅ Las tablas estarán listas
+- ✅ El inventario tendrá datos de prueba
+- ✅ Podrás loguarte con los usuarios creados
+
+### 4. **Verificar Logs y Datos Iniciales**
 
 Si aparece en blanco:
 1. Abre el Web Service → **Logs**
-2. Busca errores como:
-   - `DATABASE_URL not set`
-   - `Error: connect ECONNREFUSED`
-   - `Error: migration failed`
+2. Busca el mensaje `✅ Base de datos inicializada correctamente`
+3. Esto indica que los datos de prueba fueron creados
+
+**Usuarios para prueba (creados automáticamente):**
+```
+Maracay:
+  - admin_maracay / admin123 (Admin)
+  - usuario_maracay / perfil123 (Viewer)
+
+Magdaleno:
+  - admin_magdaleno / admin123 (Admin)
+  - usuario_magdaleno / perfil123 (Viewer)
+```
+
+En la página de Login, selecciona **Ubicación: Maracay** e ingresa `admin_maracay / admin123`
 
 ### 5. **Troubleshooting**
+
+**Si ves "Base de datos vacía" (0 medicamentos):**
+1. Abre los **Logs** del Web Service
+2. Busca el mensaje: `✅ Base de datos inicializada correctamente`
+   - Si está presente: Los datos están OK, recarga la página
+   - Si NO está: Reinicia el Web Service (deploy nuevamente)
+3. Alternativamente, ejecuta manualmente en Render CLI:
+   ```bash
+   render run --service inventario-medicamentos npm run db:init
+   ```
 
 **Si ves "Application is not available":**
 - Revisa que DATABASE_URL esté configurada
