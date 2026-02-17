@@ -11,11 +11,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { MedicationForm } from "@/components/MedicationForm";
 import { MedicationDetail } from "@/components/MedicationDetail";
 import { ExpiryBadge, StockBadge } from "@/components/StatusBadges";
-import { Search, Plus, FileDown, Eye, Pencil, Trash2, FilterX, Tag, Baby } from "lucide-react"; // ✅ Añadido Baby icon
+import { Search, Plus, FileDown, Eye, Pencil, Trash2, FilterX, Tag, Baby } from "lucide-react";
 import { format } from "date-fns";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { Badge } from "@/components/ui/badge"; // ✅ Añadido Badge
+import { Badge } from "@/components/ui/badge";
 
 export default function Inventory() {
   const { isAdmin, user } = useAuth();
@@ -36,17 +36,26 @@ export default function Inventory() {
   const deleteMutation = useDeleteMedication();
   const { toast } = useToast();
 
-  // ✅ FILTRADO MEJORADO: Ahora permite buscar por la palabra "pediatrico"
+  // ✅ FILTRADO MEJORADO: Detecta "pediátrico", "niño", "infantil"
   const filteredMedications = medications?.filter(med => {
     const searchTerm = search.toLowerCase();
-    const matchesText = med.name.toLowerCase().includes(searchTerm) || 
-                       med.presentation.toLowerCase().includes(searchTerm);
     
-    const matchesPediatricTag = (searchTerm.includes("pediat") || searchTerm.includes("niño")) 
-      ? med.isPediatric 
-      : false;
+    // 1. Busqueda normal por texto
+    const matchesText = med.name.toLowerCase().includes(searchTerm) || 
+                        med.presentation.toLowerCase().includes(searchTerm);
+    
+    // 2. Busqueda por etiqueta (Smart Search)
+    const isSearchingPediatric = searchTerm.includes("pediat") || 
+                                 searchTerm.includes("niño") || 
+                                 searchTerm.includes("infantil");
+                                 
+    const matchesPediatricTag = isSearchingPediatric ? med.isPediatric : false;
 
-    return matchesText || matchesPediatricTag;
+    // Si busca "pediatrico", mostramos SOLO los que tienen el switch activado
+    if (isSearchingPediatric) return matchesPediatricTag;
+
+    // Si no, búsqueda normal
+    return matchesText;
   });
 
   const handleExport = () => {
@@ -54,7 +63,7 @@ export default function Inventory() {
     const data = medications.map(m => ({
       Nombre: m.name,
       Dosis: m.dose,
-      Pediátrico: m.isPediatric ? "Sí" : "No", // ✅ Añadido al Excel
+      Pediátrico: m.isPediatric ? "Sí" : "No", // ✅ Columna nueva en Excel
       Familia: m.family?.name || "No asignada",
       Presentacion: m.presentation,
       Cantidad: m.quantity,
@@ -174,16 +183,20 @@ export default function Inventory() {
               </TableRow>
             ) : (
               filteredMedications?.map((med) => (
-                <TableRow key={med.id} className="group hover:bg-primary/5 transition-colors">
+                <TableRow 
+                  key={med.id} 
+                  // ✅ RESALTADO SUTIL PARA PEDIÁTRICOS
+                  className={`group transition-colors hover:bg-primary/5 ${med.isPediatric ? "bg-sky-50/40" : ""}`}
+                >
                   <TableCell>
                     <div>
                       <div className="font-semibold text-foreground group-hover:text-primary transition-colors flex items-center gap-2">
                         {med.name} 
                         <span className="text-muted-foreground font-normal">({med.dose})</span>
-                        {/* ✅ BADGE PEDIÁTRICO AÑADIDO */}
+                        {/* ✅ BADGE VISUAL */}
                         {med.isPediatric && (
-                          <Badge className="bg-sky-100 text-sky-700 hover:bg-sky-100 border-sky-200 text-[10px] font-black uppercase px-2 py-0 h-5 flex items-center gap-0.5">
-                            <Baby className="h-2.5 w-2.5" /> Pediátrico
+                          <Badge variant="outline" className="bg-sky-100 text-sky-700 border-sky-200 text-[10px] font-black uppercase px-2 py-0 h-5 flex items-center gap-0.5 whitespace-nowrap">
+                            <Baby className="h-3 w-3" /> Pediátrico
                           </Badge>
                         )}
                       </div>
