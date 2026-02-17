@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/context/AuthContext';
+import { useUsers, useCreateUser, useDeleteUser } from '@/hooks/use-users';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { Plus, Trash2, Loader2 } from 'lucide-react';
-import type { User } from '@shared/schema';
+import type { InsertUser } from '@shared/schema';
 
 export default function Users() {
   const { user: currentUser } = useAuth();
@@ -17,63 +17,11 @@ export default function Users() {
   const [newUsername, setNewUsername] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [newRole, setNewRole] = useState<'admin' | 'viewer'>('viewer');
-  const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  const { data: users = [], isLoading } = useQuery({
-    queryKey: ['/api/users'],
-    queryFn: async () => {
-      const response = await fetch('/api/users');
-      if (!response.ok) throw new Error('Failed to fetch users');
-      return response.json() as Promise<User[]>;
-    },
-  });
-
-  const createMutation = useMutation({
-    mutationFn: async () => {
-      const response = await fetch('/api/users', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          username: newUsername,
-          password: newPassword,
-          role: newRole,
-        }),
-      });
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Failed to create user');
-      }
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/users'] });
-      setIsCreateOpen(false);
-      setNewUsername('');
-      setNewPassword('');
-      setNewRole('viewer');
-      toast({ title: 'Éxito', description: 'Usuario creado correctamente.' });
-    },
-    onError: (error) => {
-      toast({
-        title: 'Error',
-        description: error instanceof Error ? error.message : 'Error al crear usuario',
-        variant: 'destructive',
-      });
-    },
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: async (id: number) => {
-      const response = await fetch(`/api/users/${id}`, { method: 'DELETE' });
-      if (!response.ok) throw new Error('Failed to delete user');
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/users'] });
-      toast({ title: 'Éxito', description: 'Usuario eliminado.' });
-    },
-  });
+  const { data: users = [], isLoading } = useUsers();
+  const createMutation = useCreateUser();
+  const deleteMutation = useDeleteUser();
 
   const handleCreate = async () => {
     if (!newUsername || !newPassword) {
@@ -84,7 +32,41 @@ export default function Users() {
       });
       return;
     }
-    await createMutation.mutateAsync();
+    
+    try {
+      await createMutation.mutateAsync({
+        username: newUsername,
+        password: newPassword,
+        role: newRole,
+      });
+      
+      setIsCreateOpen(false);
+      setNewUsername('');
+      setNewPassword('');
+      setNewRole('viewer');
+      toast({ title: 'Éxito', description: 'Usuario creado correctamente.' });
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Error al crear usuario',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleDelete = async (id: number, username: string) => {
+    if (confirm(`¿Eliminar usuario ${username}?`)) {
+      try {
+        await deleteMutation.mutateAsync(id);
+        toast({ title: 'Éxito', description: 'Usuario eliminado.' });
+      } catch (error) {
+        toast({
+          title: 'Error',
+          description: error instanceof Error ? error.message : 'Error al eliminar usuario',
+          variant: 'destructive',
+        });
+      }
+    }
   };
 
   return (
@@ -190,11 +172,7 @@ export default function Users() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => {
-                            if (confirm(`¿Eliminar usuario ${user.username}?`)) {
-                              deleteMutation.mutate(user.id);
-                            }
-                          }}
+                          onClick={() => handleDelete(user.id, user.username)}
                           disabled={deleteMutation.isPending}
                           className="text-red-600 hover:text-red-700 hover:bg-red-50"
                         >
