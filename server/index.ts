@@ -1,3 +1,7 @@
+import dotenv from "dotenv";
+// Carga automática de variables de entorno desde .env en desarrollo
+dotenv.config();
+console.log('DEBUG: DATABASE_URL=', process.env.DATABASE_URL ? '[SET]' : '[MISSING]');
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";

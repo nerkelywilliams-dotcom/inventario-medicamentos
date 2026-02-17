@@ -139,18 +139,19 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getRecentLogs(inventoryLocation?: string, limit = 10): Promise<LogWithUser[]> {
-    // Esta consulta trae los movimientos y adjunta los datos del usuario responsable
-    return await db.query.logs.findMany({
-      limit: limit,
+    // Trae los movimientos y adjunta los datos del usuario responsable.
+    // Filtramos por sede en JS después de traer los logs con su usuario
+    // para evitar complicaciones con joins en la API de Drizzle.
+    const allLogs = await db.query.logs.findMany({
       orderBy: desc(logs.timestamp),
-      with: {
-        user: true // Gracias a la relación que pusimos en schema.ts
-      },
-      // Si quieres filtrar por sede para que cada sede solo vea sus movimientos:
-      where: inventoryLocation 
-        ? eq(users.inventoryLocation, inventoryLocation) 
-        : undefined
+      with: { user: true }
     }) as LogWithUser[];
+
+    const filtered = inventoryLocation
+      ? allLogs.filter(l => l.user?.inventoryLocation === inventoryLocation)
+      : allLogs;
+
+    return filtered.slice(0, limit);
   }
 }
 
