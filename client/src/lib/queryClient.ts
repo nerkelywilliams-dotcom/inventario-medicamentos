@@ -7,6 +7,17 @@ async function throwIfResNotOk(res: Response) {
   }
 }
 
+// Helper para codificar usuario en base64 (compatible con navegador y Node)
+function encodeUserHeader(user: any): string {
+  const userJson = JSON.stringify(user);
+  // En navegador: btoa, en Node: Buffer
+  if (typeof btoa !== 'undefined') {
+    return btoa(userJson);
+  } else {
+    return Buffer.from(userJson).toString('base64');
+  }
+}
+
 export async function apiRequest(
   method: string,
   url: string,
@@ -19,7 +30,7 @@ export async function apiRequest(
   if (storedUser) {
     try {
       const user = JSON.parse(storedUser);
-      headers['x-user'] = Buffer.from(JSON.stringify(user)).toString('base64');
+      headers['x-user'] = encodeUserHeader(user);
     } catch (e) {
       // Ignore JSON parse error
     }
@@ -42,8 +53,22 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
+    const headers: Record<string, string> = {};
+    
+    // Añadir usuario al header si está disponible (necesario para filtrado por sede)
+    const storedUser = localStorage.getItem('auth_user');
+    if (storedUser) {
+      try {
+        const user = JSON.parse(storedUser);
+        headers['x-user'] = encodeUserHeader(user);
+      } catch (e) {
+        // Ignore JSON parse error
+      }
+    }
+    
     const res = await fetch(queryKey.join("/") as string, {
       credentials: "include",
+      headers,
     });
 
     if (unauthorizedBehavior === "returnNull" && res.status === 401) {

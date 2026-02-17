@@ -95,6 +95,7 @@ export function useCreateMedication() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.medications.list.path] });
+      queryClient.invalidateQueries({ queryKey: ["/api/logs"] });
     },
   });
 }
@@ -133,6 +134,7 @@ export function useUpdateMedication() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.medications.list.path] });
       queryClient.invalidateQueries({ queryKey: [api.medications.get.path] });
+      queryClient.invalidateQueries({ queryKey: ["/api/logs"] });
     },
   });
 }
@@ -162,6 +164,7 @@ export function useDeleteMedication() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.medications.list.path] });
+      queryClient.invalidateQueries({ queryKey: ["/api/logs"] });
     },
   });
 }
