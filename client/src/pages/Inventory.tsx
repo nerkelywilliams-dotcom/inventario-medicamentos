@@ -293,7 +293,23 @@ export default function Inventory() {
                                 <DialogTitle className="text-2xl font-bold text-amber-600">Editar Registro Médico</DialogTitle>
                               </DialogHeader>
                               <MedicationForm 
-                                defaultValues={med}
+                                defaultValues={{
+                                  name: med.catalog?.name,
+                                  dose: med.dose,
+                                  presentation: med.presentation,
+                                  quantity: med.quantity,
+                                  expirationDate: med.expirationDate,
+                                  description: med.catalog?.description,
+                                  mechanismOfAction: med.catalog?.mechanismOfAction,
+                                  indications: med.catalog?.indications,
+                                  posology: med.catalog?.posology,
+                                  administrationRoute: med.catalog?.administrationRoute,
+                                  contraindications: med.catalog?.contraindications,
+                                  interactions: med.catalog?.interactions,
+                                  isPediatric: med.isPediatric,
+                                  familyId: med.familyId || undefined,
+                                  imageUrl: med.catalog?.imageUrl,
+                                }}
                                 submitLabel="Guardar Cambios"
                                 isLoading={updateMutation.isPending}
                                 onSubmit={async (data) => {
@@ -303,7 +319,7 @@ export default function Inventory() {
                                   if (user) {
                                     createLog.mutate({
                                       action: "EDITAR",
-                                      details: `Se modificó información de: ${med.name}`,
+                                      details: `Se modificó información de: ${med.catalog?.name}`,
                                       userId: user.id
                                     });
                                   }
