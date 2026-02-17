@@ -195,7 +195,13 @@ export function MedicationForm({ defaultValues, onSubmit, isLoading, submitLabel
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Vencimiento</FormLabel>
-                  <FormControl><Input type="date" {...field} value={field.value ?? ""} /></FormControl>
+                  <FormControl>
+                    <Input 
+                      type="date" 
+                      {...field} 
+                      value={field.value instanceof Date ? field.value.toISOString().split('T')[0] : (field.value ?? "")}
+                    />
+                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
