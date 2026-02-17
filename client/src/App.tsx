@@ -44,8 +44,6 @@ import Login from "@/pages/Login";
 import SettingsPage from "@/pages/Settings"; 
 import LogsPage from "@/pages/logs-page";
 
-type UserRole = 'admin' | 'viewer';
-
 function Router() {
   const { user, isLoading, logout } = useAuth();
   const [location] = useLocation();
@@ -85,7 +83,7 @@ function Router() {
               <SidebarMenuItem>
                 <SidebarMenuButton asChild isActive={location === "/"} tooltip="Panel Principal">
                   <Link href="/">
-                    <LayoutDashboard />
+                    <LayoutDashboard className="size-4" />
                     <span>Panel Principal</span>
                   </Link>
                 </SidebarMenuButton>
@@ -94,13 +92,12 @@ function Router() {
               <SidebarMenuItem>
                 <SidebarMenuButton asChild isActive={location === "/inventory"} tooltip="Inventario">
                   <Link href="/inventory">
-                    <Package />
+                    <Package className="size-4" />
                     <span>Inventario</span>
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
 
-              {/* SECCIÓN ACTUALIZADA: AREA PEDIÁTRICA */}
               <SidebarMenuItem>
                 <SidebarMenuButton 
                   asChild 
@@ -108,7 +105,7 @@ function Router() {
                   tooltip="Área Pediátrica"
                 >
                   <Link href="/inventory?filter=pediatric">
-                    <Baby className="text-blue-400" />
+                    <Baby className="size-4 text-blue-400" />
                     <span className="text-blue-50/90">Área Pediátrica</span>
                   </Link>
                 </SidebarMenuButton>
@@ -124,7 +121,7 @@ function Router() {
                   <SidebarMenuItem>
                     <SidebarMenuButton asChild isActive={location === "/families"} tooltip="Familias">
                       <Link href="/families">
-                        <SettingsIcon />
+                        <SettingsIcon className="size-4" />
                         <span>Familias</span>
                       </Link>
                     </SidebarMenuButton>
@@ -132,7 +129,7 @@ function Router() {
                   <SidebarMenuItem>
                     <SidebarMenuButton asChild isActive={location === "/users"} tooltip="Usuarios">
                       <Link href="/users">
-                        <UsersIcon />
+                        <UsersIcon className="size-4" />
                         <span>Usuarios</span>
                       </Link>
                     </SidebarMenuButton>
@@ -140,7 +137,7 @@ function Router() {
                   <SidebarMenuItem>
                     <SidebarMenuButton asChild isActive={location === "/bitacora"} tooltip="Bitácora">
                       <Link href="/bitacora">
-                        <ClipboardList />
+                        <ClipboardList className="size-4" />
                         <span>Bitácora</span>
                       </Link>
                     </SidebarMenuButton>
@@ -150,7 +147,7 @@ function Router() {
               <SidebarMenuItem>
                 <SidebarMenuButton asChild isActive={location === "/settings"} tooltip="Ajustes">
                   <Link href="/settings">
-                    <UserCircle />
+                    <UserCircle className="size-4" />
                     <span>Mi Perfil</span>
                   </Link>
                 </SidebarMenuButton>
@@ -160,11 +157,11 @@ function Router() {
         </SidebarContent>
 
         <SidebarFooter>
-          <div className="rounded-[1.4rem] bg-white/5 p-4 flex flex-col gap-4">
+          <div className="rounded-[1.4rem] bg-slate-900 p-4 flex flex-col gap-4 m-2">
             <div className="flex flex-col gap-1">
               <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Usuario</p>
               <p className="text-sm font-bold text-white truncate">{user.username}</p>
-              <p className="text-[10px] text-slate-400 italic">Sede: SSIA Magdaleno</p>
+              <p className="text-[10px] text-slate-400 italic">Sede: {user.inventoryLocation === 'maracay' ? 'SSIA Maracay' : 'SSIA Magdaleno'}</p>
             </div>
             <SidebarMenuButton 
               onClick={() => logout()}
