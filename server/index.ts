@@ -100,35 +100,49 @@ async function seedAdminUser() {
 // --------------------------------------
 
 (async () => {
-  // Ejecutamos la inyección ANTES de que el servidor acepte conexiones
-  await seedAdminUser();
+  try {
+    // Ejecutamos la inyección ANTES de que el servidor acepte conexiones
+    console.log('🔄 Inicializando base de datos...');
+    await seedAdminUser();
+    console.log('✅ Base de datos inicializada');
 
-  await registerRoutes(httpServer, app);
+    console.log('🔄 Registrando rutas...');
+    await registerRoutes(httpServer, app);
+    console.log('✅ Rutas registradas');
 
-  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-    const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
+    app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+      const status = err.status || err.statusCode || 500;
+      const message = err.message || "Internal Server Error";
+      console.error('❌ Error:', message);
+      res.status(status).json({ message });
+      throw err;
+    });
 
-    res.status(status).json({ message });
-    throw err;
-  });
+    if (process.env.NODE_ENV === "production") {
+      console.log('🔄 Sirviendo archivos estáticos...');
+      serveStatic(app);
+      console.log('✅ Archivos estáticos listos');
+    } else {
+      console.log('🔄 Configurando Vite para desarrollo...');
+      const { setupVite } = await import("./vite");
+      await setupVite(httpServer, app);
+      console.log('✅ Vite configurado');
+    }
 
-  if (process.env.NODE_ENV === "production") {
-    serveStatic(app);
-  } else {
-    const { setupVite } = await import("./vite");
-    await setupVite(httpServer, app);
+    const port = parseInt(process.env.PORT || "5000", 10);
+    httpServer.listen(
+      {
+        port,
+        host: "0.0.0.0",
+        reusePort: true,
+      },
+      () => {
+        log(`🚀 Servidor corriendo en puerto ${port}`);
+        log(`📱 Modo: ${process.env.NODE_ENV || 'development'}`);
+      },
+    );
+  } catch (error) {
+    console.error('❌ Error fatal al iniciar servidor:', error);
+    process.exit(1);
   }
-
-  const port = parseInt(process.env.PORT || "5000", 10);
-  httpServer.listen(
-    {
-      port,
-      host: "0.0.0.0",
-      reusePort: true,
-    },
-    () => {
-      log(`serving on port ${port}`);
-    },
-  );
 })();
