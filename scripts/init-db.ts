@@ -20,7 +20,107 @@ async function initialize() {
   try {
     console.log("📚 Crear/Actualizando esquema...");
     // Las tablas ya deberían existir si drizzle-kit push fue ejecutado
-    
+
+    // Si el esquema previo tenía las columnas del catálogo embebidas en `medications`,
+    // detectamos y migramos a la nueva tabla `medication_catalog`.
+    console.log("🔍 Verificando necesidad de migración Maestro-Detalle...");
+
+    const checkCatalog = await pool.query(
+      "SELECT to_regclass('public.medication_catalog') as exists"
+    );
+
+    const catalogExists = checkCatalog.rows[0] && checkCatalog.rows[0].exists !== null;
+
+    if (!catalogExists) {
+      console.log("  ├─ Tabla 'medication_catalog' no existe. Ejecutando migración de catálogo...");
+      // Si no existe, intentaremos crear la tabla y poblarla a partir de datos existentes en `medications`.
+      // Usamos SQL crudo para ser tolerantes a esquemas previos.
+
+      // 1) Crear tabla medication_catalog si no existe
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS medication_catalog (
+          id SERIAL PRIMARY KEY,
+          name TEXT NOT NULL,
+          description TEXT,
+          mechanism_of_action TEXT,
+          indications TEXT,
+          posology TEXT,
+          administration_route TEXT,
+          contraindications TEXT,
+          interactions TEXT,
+          image_url TEXT,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+          updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+        );
+      `);
+      // Asegurar índice único en name para soportar UPSERT (ON CONFLICT)
+      await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS medication_catalog_name_uindex ON medication_catalog (name);`);
+
+      // 2) Insertar catálogos únicos desde medications (si existen columnas compatibles)
+      // Verificamos si la columna `name` existe en `medications`
+      const colCheck = await pool.query(
+        "SELECT column_name FROM information_schema.columns WHERE table_name='medications' AND column_name IN ('name','description')"
+      );
+
+      if (colCheck.rows.length > 0) {
+        console.log("  ├─ Migrando datos desde 'medications' hacia 'medication_catalog'...");
+
+        // Insertar catálogos únicos por nombre
+        await pool.query(`
+          INSERT INTO medication_catalog (name, description, mechanism_of_action, indications, posology, administration_route, contraindications, interactions, image_url)
+          SELECT DISTINCT
+            COALESCE(name, '') AS name,
+            description,
+            mechanism_of_action,
+            indications,
+            posology,
+            administration_route,
+            contraindications,
+            interactions,
+            image_url
+          FROM medications
+          WHERE COALESCE(name, '') <> ''
+          ON CONFLICT (name) DO NOTHING;
+        `);
+
+        // 3) Añadir columna catalog_id a medications si no existe
+        const catalogCol = await pool.query(
+          "SELECT column_name FROM information_schema.columns WHERE table_name='medications' AND column_name='catalog_id'"
+        );
+
+        if (catalogCol.rows.length === 0) {
+          console.log("  ├─ Agregando columna 'catalog_id' a 'medications'...");
+          await pool.query(`ALTER TABLE medications ADD COLUMN IF NOT EXISTS catalog_id INTEGER`);
+        }
+
+        // 4) Actualizar catalog_id en medications enlazando por nombre
+        console.log("  ├─ Enlazando registros de 'medications' con 'medication_catalog' por nombre...");
+        await pool.query(`
+          UPDATE medications m
+          SET catalog_id = c.id
+          FROM medication_catalog c
+          WHERE COALESCE(m.name, '') <> '' AND c.name = m.name
+        `);
+
+        // 5) (Opcional) Establecer FK y NOT NULL si todos los registros se enlazaron
+        // Verificamos si hay medications sin catalog_id
+        const nullCatalog = await pool.query("SELECT COUNT(*)::int AS cnt FROM medications WHERE catalog_id IS NULL");
+        if (nullCatalog.rows[0].cnt === 0) {
+          console.log("  ├─ Estableciendo FK y constraint en 'medications.catalog_id'...");
+          await pool.query(`ALTER TABLE medications ALTER COLUMN catalog_id SET NOT NULL`);
+          await pool.query(`ALTER TABLE medications ADD CONSTRAINT medications_catalog_fk FOREIGN KEY (catalog_id) REFERENCES medication_catalog(id) ON DELETE SET NULL`);
+        } else {
+          console.log(`  ├─ Advertencia: ${nullCatalog.rows[0].cnt} registros sin catalog_id; dejando columna nullable.`);
+        }
+
+        console.log("  ✅ Migración Maestro-Detalle completada (tabla medication_catalog creada y enlazada)");
+      } else {
+        console.log("  ├─ No se detectaron columnas de catálogo en 'medications'. Creada la tabla vacía 'medication_catalog'.");
+      }
+    } else {
+      console.log("  ✅ Tabla 'medication_catalog' ya existe, no es necesaria migración.");
+    }
+
     console.log("🌱 Inicializando datos de prueba...");
 
     // Verificar familias
