@@ -299,16 +299,16 @@ export default function Inventory() {
                                   presentation: med.presentation,
                                   quantity: med.quantity,
                                   expirationDate: med.expirationDate,
-                                  description: med.catalog?.description,
-                                  mechanismOfAction: med.catalog?.mechanismOfAction,
-                                  indications: med.catalog?.indications,
-                                  posology: med.catalog?.posology,
-                                  administrationRoute: med.catalog?.administrationRoute,
+                                  description: med.catalog?.description ?? undefined,
+                                  mechanismOfAction: med.catalog?.mechanismOfAction ?? undefined,
+                                  indications: med.catalog?.indications ?? undefined,
+                                  posology: med.catalog?.posology ?? undefined,
+                                  administrationRoute: med.catalog?.administrationRoute ?? undefined,
                                   contraindications: med.catalog?.contraindications,
                                   interactions: med.catalog?.interactions,
                                   isPediatric: med.isPediatric,
                                   familyId: med.familyId || undefined,
-                                  imageUrl: med.catalog?.imageUrl,
+                                  imageUrl: med.catalog?.imageUrl ?? undefined,
                                 }}
                                 submitLabel="Guardar Cambios"
                                 isLoading={updateMutation.isPending}
