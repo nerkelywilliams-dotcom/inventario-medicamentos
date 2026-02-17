@@ -5,6 +5,7 @@ import * as XLSX from "xlsx";
 import { useMedications, useCreateMedication, useUpdateMedication, useDeleteMedication } from "@/hooks/use-medications";
 import { useFamilies } from "@/hooks/use-families";
 import { useAuth } from "@/context/AuthContext";
+import { useCreateLog } from "@/hooks/use-logs"; // ✅ Nuevo hook para la bitácora
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -18,7 +19,7 @@ import { format } from "date-fns";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
-import { useSearch, Link } from "wouter"; // ✅ Importación necesaria para detectar el filtro de la URL
+import { useSearch, Link } from "wouter";
 
 export default function Inventory() {
   const { isAdmin, user } = useAuth();
@@ -28,7 +29,6 @@ export default function Inventory() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [detailId, setDetailId] = useState<number | null>(null);
 
-  // ✅ Lógica para detectar el filtro pediátrico desde la URL (?filter=pediatric)
   const searchString = useSearch();
   const params = new URLSearchParams(searchString);
   const isUrlPediatricFilter = params.get("filter") === "pediatric";
@@ -42,9 +42,9 @@ export default function Inventory() {
   const createMutation = useCreateMedication();
   const updateMutation = useUpdateMedication();
   const deleteMutation = useDeleteMedication();
+  const createLog = useCreateLog(); // ✅ Inicializamos la bitácora
   const { toast } = useToast();
 
-  // ✅ FILTRADO MEJORADO: Ahora incluye la detección por URL del Sidebar
   const filteredMedications = medications?.filter(med => {
     const normalize = (str: string) => 
       str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
@@ -53,13 +53,11 @@ export default function Inventory() {
     const name = normalize(med.name);
     const presentation = normalize(med.presentation);
 
-    // 1. PRIORIDAD: Si el filtro de la URL está activo (desde el Sidebar)
     if (isUrlPediatricFilter) {
       const matchesSearch = name.includes(term) || presentation.includes(term);
       return med.isPediatric === true && matchesSearch;
     }
 
-    // 2. Si el usuario escribe palabras clave en el buscador manual
     const isSearchingPediatric = term.startsWith("ped") || 
                                  term.includes("nino") || 
                                  term.includes("infantil") ||
@@ -69,7 +67,6 @@ export default function Inventory() {
       return med.isPediatric === true;
     }
 
-    // 3. Búsqueda normal
     return name.includes(term) || presentation.includes(term);
   });
 
@@ -93,8 +90,19 @@ export default function Inventory() {
   };
 
   const handleDelete = async (id: number) => {
-    if (window.confirm("¿Estás seguro de eliminar este medicamento? Esta acción no se puede deshacer.")) {
+    const medicationToDelete = medications?.find(m => m.id === id);
+    if (window.confirm(`¿Estás seguro de eliminar ${medicationToDelete?.name}? Esta acción no se puede deshacer.`)) {
       await deleteMutation.mutateAsync(id);
+      
+      // ✅ REGISTRO EN BITÁCORA (Eliminación)
+      if (user) {
+        createLog.mutate({
+          action: "ELIMINAR",
+          details: `Se eliminó el medicamento: ${medicationToDelete?.name || id}`,
+          userId: user.id
+        });
+      }
+
       toast({ title: "Eliminado", description: "El registro ha sido removido del sistema." });
     }
   };
@@ -103,7 +111,6 @@ export default function Inventory() {
     <div className="space-y-6 animate-fade-in">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          {/* ✅ Título dinámico según el filtro del Sidebar */}
           <h2 className="text-3xl font-display font-bold text-foreground">
             {isUrlPediatricFilter ? (
               <span className="flex items-center gap-2 text-blue-600">
@@ -118,7 +125,6 @@ export default function Inventory() {
           </p>
         </div>
         <div className="flex gap-2">
-          {/* ✅ Botón para salir del modo pediátrico si está activo */}
           {isUrlPediatricFilter && (
             <Button asChild variant="outline" className="border-blue-200 text-blue-600 hover:bg-blue-50">
               <Link href="/inventory">Ver Todo el Inventario</Link>
@@ -144,6 +150,16 @@ export default function Inventory() {
                   isLoading={createMutation.isPending}
                   onSubmit={async (data) => {
                     await createMutation.mutateAsync(data);
+                    
+                    // ✅ REGISTRO EN BITÁCORA (Creación)
+                    if (user) {
+                      createLog.mutate({
+                        action: "CREAR",
+                        details: `Se registró nuevo medicamento: ${data.name} (${data.dose})`,
+                        userId: user.id
+                      });
+                    }
+
                     setIsCreateOpen(false);
                     toast({ title: "Éxito", description: "Medicamento registrado correctamente en el inventario." });
                   }}
@@ -282,6 +298,16 @@ export default function Inventory() {
                                 isLoading={updateMutation.isPending}
                                 onSubmit={async (data) => {
                                   await updateMutation.mutateAsync({ id: med.id, ...data });
+                                  
+                                  // ✅ REGISTRO EN BITÁCORA (Edición)
+                                  if (user) {
+                                    createLog.mutate({
+                                      action: "EDITAR",
+                                      details: `Se modificó información de: ${med.name}`,
+                                      userId: user.id
+                                    });
+                                  }
+
                                   setEditingId(null);
                                   toast({ title: "Actualizado", description: "Los cambios han sido aplicados con éxito." });
                                 }}
