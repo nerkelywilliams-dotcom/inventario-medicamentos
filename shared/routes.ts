@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { insertFamilySchema, insertMedicationSchema, families, medications } from './schema';
+import { insertFamilySchema, insertMedicationSchema, families, medications, medicationCatalog } from './schema';
 
 export const errorSchemas = {
   validation: z.object({
@@ -50,14 +50,14 @@ export const api = {
         familyId: z.string().optional(),
       }).optional(),
       responses: {
-        200: z.array(z.custom<typeof medications.$inferSelect & { family?: typeof families.$inferSelect }>()),
+        200: z.array(z.custom<typeof medications.$inferSelect & { catalog: typeof medicationCatalog.$inferSelect; family?: typeof families.$inferSelect }>()),
       },
     },
     get: {
       method: 'GET' as const,
       path: '/api/medications/:id',
       responses: {
-        200: z.custom<typeof medications.$inferSelect & { family?: typeof families.$inferSelect }>(),
+        200: z.custom<typeof medications.$inferSelect & { catalog: typeof medicationCatalog.$inferSelect; family?: typeof families.$inferSelect }>(),
         404: errorSchemas.notFound,
       },
     },
@@ -66,7 +66,7 @@ export const api = {
       path: '/api/medications',
       input: insertMedicationSchema,
       responses: {
-        201: z.custom<typeof medications.$inferSelect>(),
+        201: z.custom<typeof medications.$inferSelect & { catalog: typeof medicationCatalog.$inferSelect }>(),
         400: errorSchemas.validation,
       },
     },
@@ -75,7 +75,7 @@ export const api = {
       path: '/api/medications/:id',
       input: insertMedicationSchema.partial(),
       responses: {
-        200: z.custom<typeof medications.$inferSelect>(),
+        200: z.custom<typeof medications.$inferSelect & { catalog: typeof medicationCatalog.$inferSelect }>(),
         400: errorSchemas.validation,
         404: errorSchemas.notFound,
       },
