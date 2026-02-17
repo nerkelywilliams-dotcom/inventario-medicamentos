@@ -1,3 +1,5 @@
+"use client"
+
 import { useState } from "react";
 import * as XLSX from "xlsx";
 import { useMedications, useCreateMedication, useUpdateMedication, useDeleteMedication } from "@/hooks/use-medications";
@@ -16,6 +18,7 @@ import { format } from "date-fns";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
+import { useSearch, Link } from "wouter"; // ✅ Importación necesaria para detectar el filtro de la URL
 
 export default function Inventory() {
   const { isAdmin, user } = useAuth();
@@ -24,6 +27,11 @@ export default function Inventory() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [detailId, setDetailId] = useState<number | null>(null);
+
+  // ✅ Lógica para detectar el filtro pediátrico desde la URL (?filter=pediatric)
+  const searchString = useSearch();
+  const params = new URLSearchParams(searchString);
+  const isUrlPediatricFilter = params.get("filter") === "pediatric";
   
   const { data: medications, isLoading } = useMedications({ 
     search: search || undefined,
@@ -36,26 +44,33 @@ export default function Inventory() {
   const deleteMutation = useDeleteMedication();
   const { toast } = useToast();
 
-  // ✅ FILTRADO MEJORADO: Detecta "pediátrico", "niño", "infantil"
+  // ✅ FILTRADO MEJORADO: Ahora incluye la detección por URL del Sidebar
   const filteredMedications = medications?.filter(med => {
-    const searchTerm = search.toLowerCase();
-    
-    // 1. Busqueda normal por texto
-    const matchesText = med.name.toLowerCase().includes(searchTerm) || 
-                        med.presentation.toLowerCase().includes(searchTerm);
-    
-    // 2. Busqueda por etiqueta (Smart Search)
-    const isSearchingPediatric = searchTerm.includes("pediat") || 
-                                 searchTerm.includes("niño") || 
-                                 searchTerm.includes("infantil");
-                                 
-    const matchesPediatricTag = isSearchingPediatric ? med.isPediatric : false;
+    const normalize = (str: string) => 
+      str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
-    // Si busca "pediatrico", mostramos SOLO los que tienen el switch activado
-    if (isSearchingPediatric) return matchesPediatricTag;
+    const term = normalize(search);
+    const name = normalize(med.name);
+    const presentation = normalize(med.presentation);
 
-    // Si no, búsqueda normal
-    return matchesText;
+    // 1. PRIORIDAD: Si el filtro de la URL está activo (desde el Sidebar)
+    if (isUrlPediatricFilter) {
+      const matchesSearch = name.includes(term) || presentation.includes(term);
+      return med.isPediatric === true && matchesSearch;
+    }
+
+    // 2. Si el usuario escribe palabras clave en el buscador manual
+    const isSearchingPediatric = term.startsWith("ped") || 
+                                 term.includes("nino") || 
+                                 term.includes("infantil") ||
+                                 term.includes("bebe");
+
+    if (isSearchingPediatric) {
+      return med.isPediatric === true;
+    }
+
+    // 3. Búsqueda normal
+    return name.includes(term) || presentation.includes(term);
   });
 
   const handleExport = () => {
@@ -63,7 +78,7 @@ export default function Inventory() {
     const data = medications.map(m => ({
       Nombre: m.name,
       Dosis: m.dose,
-      Pediátrico: m.isPediatric ? "Sí" : "No", // ✅ Columna nueva en Excel
+      Pediátrico: m.isPediatric ? "Sí" : "No",
       Familia: m.family?.name || "No asignada",
       Presentacion: m.presentation,
       Cantidad: m.quantity,
@@ -88,12 +103,28 @@ export default function Inventory() {
     <div className="space-y-6 animate-fade-in">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-3xl font-display font-bold text-foreground">Gestión de Farmacia</h2>
+          {/* ✅ Título dinámico según el filtro del Sidebar */}
+          <h2 className="text-3xl font-display font-bold text-foreground">
+            {isUrlPediatricFilter ? (
+              <span className="flex items-center gap-2 text-blue-600">
+                <Baby className="h-8 w-8" /> Área Pediátrica
+              </span>
+            ) : (
+              "Gestión de Farmacia"
+            )}
+          </h2>
           <p className="text-muted-foreground flex items-center gap-2">
             Sede: <span className="capitalize font-semibold text-primary">{user?.inventoryLocation === 'maracay' ? 'SSIA Maracay' : 'SSIA Magdaleno'}</span>
           </p>
         </div>
         <div className="flex gap-2">
+          {/* ✅ Botón para salir del modo pediátrico si está activo */}
+          {isUrlPediatricFilter && (
+            <Button asChild variant="outline" className="border-blue-200 text-blue-600 hover:bg-blue-50">
+              <Link href="/inventory">Ver Todo el Inventario</Link>
+            </Button>
+          )}
+          
           <Button variant="outline" onClick={handleExport} className="gap-2 border-primary/20 hover:bg-primary/5">
             <FileDown className="h-4 w-4" /> Exportar Excel
           </Button>
@@ -127,7 +158,7 @@ export default function Inventory() {
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input 
-            placeholder="Buscar por nombre, principio o escriba 'pediatrico'..." 
+            placeholder={isUrlPediatricFilter ? "Buscar dentro de pediátricos..." : "Buscar por nombre, principio o escriba 'pediatrico'..."} 
             className="pl-9 border-none bg-muted/50 focus-visible:ring-1 focus-visible:ring-primary/20"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -146,9 +177,13 @@ export default function Inventory() {
             </SelectContent>
           </Select>
         </div>
-        {(search || familyFilter !== "all") && (
-          <Button variant="ghost" size="icon" onClick={() => { setSearch(""); setFamilyFilter("all"); }} title="Limpiar filtros">
-            <FilterX className="h-4 w-4 text-muted-foreground hover:text-destructive transition-colors" />
+        {(search || familyFilter !== "all" || isUrlPediatricFilter) && (
+          <Button asChild={isUrlPediatricFilter} variant="ghost" size="icon" onClick={() => { setSearch(""); setFamilyFilter("all"); }} title="Limpiar filtros">
+            {isUrlPediatricFilter ? (
+              <Link href="/inventory"><FilterX className="h-4 w-4 text-muted-foreground hover:text-destructive" /></Link>
+            ) : (
+              <FilterX className="h-4 w-4 text-muted-foreground hover:text-destructive transition-colors" />
+            )}
           </Button>
         )}
       </div>
@@ -178,14 +213,13 @@ export default function Inventory() {
             ) : filteredMedications?.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={5} className="h-48 text-center text-muted-foreground">
-                  No se encontraron medicamentos registrados en esta sede.
+                  No se encontraron medicamentos {isUrlPediatricFilter ? "pediátricos" : ""} registrados en esta sede.
                 </TableCell>
               </TableRow>
             ) : (
               filteredMedications?.map((med) => (
                 <TableRow 
                   key={med.id} 
-                  // ✅ RESALTADO SUTIL PARA PEDIÁTRICOS
                   className={`group transition-colors hover:bg-primary/5 ${med.isPediatric ? "bg-sky-50/40" : ""}`}
                 >
                   <TableCell>
@@ -193,7 +227,7 @@ export default function Inventory() {
                       <div className="font-semibold text-foreground group-hover:text-primary transition-colors flex items-center gap-2">
                         {med.name} 
                         <span className="text-muted-foreground font-normal">({med.dose})</span>
-                        {/* ✅ BADGE VISUAL */}
+                        
                         {med.isPediatric && (
                           <Badge variant="outline" className="bg-sky-100 text-sky-700 border-sky-200 text-[10px] font-black uppercase px-2 py-0 h-5 flex items-center gap-0.5 whitespace-nowrap">
                             <Baby className="h-3 w-3" /> Pediátrico
