@@ -185,7 +185,10 @@ function Router() {
             <Route path="/" component={Dashboard} />
             <Route path="/inventory" component={Inventory} />
             <Route path="/settings" component={SettingsPage} />
-            <Route path="/bitacora" component={LogsPage} />
+            
+            <Route path="/bitacora">
+              {user.role === 'admin' ? <LogsPage /> : <NotFound />}
+            </Route>
             
             <Route path="/families">
               {user.role === 'admin' ? <Families /> : <NotFound />}

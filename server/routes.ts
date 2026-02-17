@@ -57,9 +57,12 @@ export async function registerRoutes(
     }
   });
 
-  // ✅ NUEVA RUTA: Obtener Logs para la bitácora
+  // ✅ NUEVA RUTA: Obtener Logs para la bitácora (SOLO PARA ADMINS)
   app.get('/api/logs', async (req, res) => {
     if (!req.user) return res.status(401).json({ message: 'No autorizado' });
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Solo administradores pueden acceder a la bitácora' });
+    }
     const logs = await storage.getRecentLogs(req.user.inventoryLocation, 20);
     res.json(logs);
   });

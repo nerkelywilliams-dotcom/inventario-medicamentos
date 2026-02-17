@@ -1,5 +1,6 @@
 import { useLogs } from "@/hooks/use-logs";
 import { useMedications } from "@/hooks/use-medications";
+import { useAuth } from "@/context/AuthContext";
 import { Link } from "wouter"; // ✅ Importación añadida
 import { Pill, AlertCircle, AlertTriangle, Clock, ArrowDownLeft, ArrowUpRight, FileEdit, History, RefreshCw } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
@@ -8,7 +9,9 @@ import { es } from "date-fns/locale";
 
 export default function Dashboard() {
   const { data: medications } = useMedications();
-  // ✅ CARGA DE LOGS REALES
+  const { isAdmin } = useAuth();
+  
+  // ✅ SOLO CARGAR LOGS SI ES ADMIN
   const { data: logs, isLoading: isLoadingLogs } = useLogs();
   
   const now = new Date();
@@ -111,7 +114,8 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* --- SECCIÓN SINCRONIZADA: BITÁCORA REAL --- */}
+      {/* --- SECCIÓN SINCRONIZADA: BITÁCORA REAL (SOLO PARA ADMINS) --- */}
+      {isAdmin && (
       <div className="bg-white rounded-[3.5rem] p-12 border border-slate-100 shadow-lg shadow-slate-200/50">
         <div className="flex items-center justify-between mb-8">
             <div className="flex items-center gap-3">
@@ -197,6 +201,7 @@ export default function Dashboard() {
             </table>
         </div>
       </div>
+      )}
     </div>
   );
 }
