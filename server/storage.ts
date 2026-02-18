@@ -13,6 +13,8 @@ export type MedicationWithFamily = MedicationWithCatalogAndFamily;
 
 export interface IStorage {
   // Medication Catalog
+  getMedicationCatalogs(): Promise<MedicationCatalog[]>; // ✅ AGREGADO
+  getMedicationCatalog(id: number): Promise<MedicationCatalog | undefined>; // ✅ AGREGADO
   getMedicationCatalogByName(name: string): Promise<MedicationCatalog | undefined>;
   createMedicationCatalog(catalog: InsertMedicationCatalog): Promise<MedicationCatalog>;
 
@@ -36,15 +38,27 @@ export interface IStorage {
   createUser(user: InsertUser & { inventoryLocation: string }): Promise<User>;
   deleteUser(id: number): Promise<void>;
 
-  // ✅ Logs (Bitácora)
+  // Logs (Bitácora)
   createLog(log: InsertLog): Promise<Log>;
   getRecentLogs(inventoryLocation?: string, limit?: number): Promise<LogWithUser[]>;
 }
 
 export class DatabaseStorage implements IStorage {
   // --- MEDICATION CATALOG ---
+  // ✅ AGREGADO: Obtener todo el catálogo científico
+  async getMedicationCatalogs(): Promise<MedicationCatalog[]> {
+    return await db.select().from(medicationCatalog).orderBy(medicationCatalog.name);
+  }
+
+  // ✅ AGREGADO: Obtener una ficha técnica específica
+  async getMedicationCatalog(id: number): Promise<MedicationCatalog | undefined> {
+    const [catalog] = await db.select().from(medicationCatalog).where(eq(medicationCatalog.id, id));
+    return catalog;
+  }
+
   async getMedicationCatalogByName(name: string): Promise<MedicationCatalog | undefined> {
-    const [catalog] = await db.select().from(medicationCatalog).where(eq(medicationCatalog.name, name));
+    // Usamos ilike para que no importe si escribe en mayúsculas o minúsculas
+    const [catalog] = await db.select().from(medicationCatalog).where(ilike(medicationCatalog.name, name));
     return catalog;
   }
 
@@ -52,6 +66,8 @@ export class DatabaseStorage implements IStorage {
     const [catalog] = await db.insert(medicationCatalog).values(insertCatalog).returning();
     return catalog;
   }
+
+  // --- FAMILIES ---
   async getFamilies(inventoryLocation?: string): Promise<Family[]> {
     if (inventoryLocation) {
       return await db.select().from(families).where(eq(families.inventoryLocation, inventoryLocation));
@@ -86,12 +102,6 @@ export class DatabaseStorage implements IStorage {
   async getMedications(search?: string, familyId?: string, inventoryLocation?: string): Promise<MedicationWithFamily[]> {
     const conditions = [];
     
-    // Si hay búsqueda, buscar tanto en nombre del catálogo como en otros campos
-    if (search) {
-      // NOTA: ilike en medications se aplicaría sobre el catálogo mediante JOIN
-      // Por ahora, buscaremos en el catálogo
-    }
-    
     if (familyId) conditions.push(eq(medications.familyId, parseInt(familyId)));
     if (inventoryLocation) conditions.push(eq(medications.inventoryLocation, inventoryLocation));
 
@@ -101,10 +111,10 @@ export class DatabaseStorage implements IStorage {
       orderBy: desc(medications.createdAt)
     }) as MedicationWithFamily[];
 
-    // Aplicar búsqueda por nombre del catálogo si es necesario
     if (search) {
       return result.filter(med => 
-        med.catalog?.name?.toLowerCase().includes(search.toLowerCase())
+        med.catalog?.name?.toLowerCase().includes(search.toLowerCase()) ||
+        med.catalog?.indications?.toLowerCase().includes(search.toLowerCase())
       );
     }
 
@@ -161,16 +171,13 @@ export class DatabaseStorage implements IStorage {
     await db.delete(users).where(eq(users.id, id));
   }
 
-  // --- ✅ NUEVO: LOGS IMPLEMENTATION ---
+  // --- LOGS IMPLEMENTATION ---
   async createLog(insertLog: InsertLog): Promise<Log> {
     const [newLog] = await db.insert(logs).values(insertLog).returning();
     return newLog;
   }
 
   async getRecentLogs(inventoryLocation?: string, limit = 10): Promise<LogWithUser[]> {
-    // Trae los movimientos y adjunta los datos del usuario responsable.
-    // Filtramos por sede en JS después de traer los logs con su usuario
-    // para evitar complicaciones con joins en la API de Drizzle.
     const allLogs = await db.query.logs.findMany({
       orderBy: desc(logs.timestamp),
       with: { user: true }

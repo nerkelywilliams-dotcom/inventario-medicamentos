@@ -188,6 +188,14 @@ export async function registerRoutes(
   });
 
   // --- MEDICATIONS ---
+  
+  // ✅ NUEVA RUTA: Ver todo el catálogo científico (Para que usted "vea" el catálogo)
+  app.get('/api/medication-catalog', async (req, res) => {
+    if (!req.user) return res.status(401).json({ message: 'No autorizado' });
+    const catalog = await storage.getMedicationCatalogs();
+    res.json(catalog);
+  });
+
   app.get(api.medications.list.path, async (req, res) => {
     if (!req.user) {
       return res.status(401).json({ message: 'No autorizado' });
@@ -217,15 +225,15 @@ export async function registerRoutes(
       };
       const input = insertMedicationFullSchema.parse(body);
 
-      // 1. Verificar si el medicamento ya existe en el catálogo
+      // 1. Verificar si el medicamento ya existe en el catálogo (case-insensitive para evitar duplicados por tildes o mayúsculas)
       let catalogId = null;
       const existingCatalog = await storage.getMedicationCatalogByName(input.name);
       
       if (existingCatalog) {
-        // El medicamento ya existe en el catálogo, reutilizar su información
+        // Reutilizar el catálogo existente
         catalogId = existingCatalog.id;
       } else {
-        // Crear una nueva entrada en el catálogo con la información científica
+        // Crear nueva ficha técnica
         const catalogEntry = await storage.createMedicationCatalog({
           name: input.name,
           description: input.description,
@@ -240,7 +248,7 @@ export async function registerRoutes(
         catalogId = catalogEntry.id;
       }
 
-      // 2. Crear el registro de inventario vinculado al catálogo
+      // 2. Crear el registro físico en el inventario
       const medication = await storage.createMedication({
         dose: input.dose || "Ver empaque",
         presentation: input.presentation,
@@ -251,15 +259,14 @@ export async function registerRoutes(
         inventoryLocation: req.user.inventoryLocation
       }, catalogId);
 
-      // 3. Obtener el medicamento completo con catálogo para la respuesta
       const completemedication = await storage.getMedication(medication.id);
 
-      // ✅ LOG: Registro de ingreso
+      // ✅ LOG: Notificar si se reutilizó la ficha o se creó una nueva
       await storage.createLog({
         userId: (req.user as any).id,
         action: "INGRESO",
-        medicationName: completemedication?.catalog?.name || medication.id.toString(),
-        details: `Registro inicial con ${medication.quantity} unidades. ${existingCatalog ? '(Reutilizado del catálogo)' : '(Nuevo en catálogo)'}`
+        medicationName: input.name,
+        details: `${input.presentation} (${input.dose}). ${existingCatalog ? 'Ficha técnica reutilizada.' : 'Ficha técnica nueva creada.'}`
       });
 
       res.status(201).json(completemedication);
@@ -285,7 +292,6 @@ export async function registerRoutes(
         expirationDate: req.body.expirationDate ? new Date(req.body.expirationDate) : undefined
       };
       
-      // Solo actualizar los campos del inventario (no los del catálogo)
       const updateFields: any = {};
       if (body.dose !== undefined) updateFields.dose = body.dose;
       if (body.presentation !== undefined) updateFields.presentation = body.presentation;
@@ -300,14 +306,13 @@ export async function registerRoutes(
         return res.status(404).json({ message: 'Medication not found' });
       }
 
-      // ✅ LOG: Detección de cambios de stock o edición
       if (oldMed) {
         let action = "ACTUALIZACIÓN";
-        let details = "Datos actualizados.";
+        let details = "Datos de lote actualizados.";
         if (updateFields.quantity !== undefined && updateFields.quantity !== oldMed.quantity) {
           const diff = updateFields.quantity - oldMed.quantity;
           action = diff > 0 ? "INGRESO" : "SALIDA";
-          details = diff > 0 ? `Se sumaron ${diff} unidades.` : `Se retiraron ${Math.abs(diff)} unidades.`;
+          details = diff > 0 ? `Aumento de stock: +${diff} unidades.` : `Egreso de stock: ${diff} unidades.`;
         }
         await storage.createLog({
           userId: (req.user as any).id,
@@ -317,7 +322,6 @@ export async function registerRoutes(
         });
       }
 
-      // Retornar medicamento completo con catálogo
       const completemedication = await storage.getMedication(id);
       res.json(completemedication);
     } catch (err) {
@@ -338,12 +342,11 @@ export async function registerRoutes(
     
     if (med) {
       await storage.deleteMedication(id);
-      // ✅ LOG: Registro de eliminación
       await storage.createLog({
         userId: (req.user as any).id,
         action: "ELIMINACIÓN",
         medicationName: med.catalog?.name || med.id.toString(),
-        details: "Medicamento eliminado del sistema."
+        details: `Lote eliminado (${med.presentation}).`
       });
     }
     res.status(204).end();
@@ -395,8 +398,8 @@ async function seedDatabase() {
     // Create medication catalogs
     const paracetamolCatalog = await storage.createMedicationCatalog({
       name: "Paracetamol",
-      description: "Analgésico y antipirético eficaz para el control del dolor leve a moderado y la fiebre.",
-      mechanismOfAction: "Inhibe la síntesis de prostaglandinas en el sistema nervioso central.",
+      description: "Analgésico y antipirético eficaz.",
+      mechanismOfAction: "Inhibe la síntesis de prostaglandinas en el SNC.",
       indications: "Dolor leve a moderado, fiebre.",
       posology: "Adultos: 500 mg - 1 g cada 4-6 horas.",
       administrationRoute: "Oral",
