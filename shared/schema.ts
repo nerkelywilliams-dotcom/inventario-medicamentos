@@ -85,7 +85,7 @@ export const familiesRelations = relations(families, ({ many }) => ({
   medications: many(medications),
 }));
 
-// 2. Relación Usuarios <-> Logs
+// 3. Relación Usuarios <-> Logs
 export const usersRelations = relations(users, ({ many }) => ({
   logs: many(logs),
 }));
@@ -106,16 +106,15 @@ export const insertMedicationCatalogSchema = createInsertSchema(medicationCatalo
 });
 
 // Medicamentos (Inventario)
-// Nota: isPediatric es opcional en el insert porque tiene default(false)
 export const insertMedicationSchema = createInsertSchema(medications).omit({ 
   id: true, 
   createdAt: true, 
   inventoryLocation: true,
-  catalogId: true, // El catalogId se asigna en la lógica de negocio
+  catalogId: true, 
 });
 
-// Esquema combinado para crear medicamentos (usado en API)
-// Incluye campos tanto del catálogo como del inventario
+// --- AQUÍ ESTÁ LA CORRECCIÓN IMPORTANTE ---
+// Esquema combinado para crear medicamentos (usado en API y Formulario)
 export const insertMedicationFullSchema = z.object({
   // Campos del catálogo de medicamentos
   name: z.string().min(1, "El nombre del medicamento es requerido"),
@@ -131,10 +130,15 @@ export const insertMedicationFullSchema = z.object({
   // Campos específicos del inventario
   dose: z.string().optional().default("Ver empaque"),
   presentation: z.string().min(1, "La presentación es requerida"),
-  quantity: z.number().int().min(0).optional().default(0),
-  expirationDate: z.coerce.date(),
+  
+  // CORRECCIÓN: Usamos z.coerce.number() para transformar texto a número automáticamente
+  quantity: z.coerce.number().int().min(0, "El stock no puede ser negativo").default(0),
+  
+  expirationDate: z.coerce.date(), // Convierte string de fecha a objeto Date
   isPediatric: z.boolean().optional().default(false),
-  familyId: z.number().int().optional(),
+  
+  // CORRECCIÓN: También aplicamos coerción aquí por si el select envía un string
+  familyId: z.coerce.number().int().optional(),
 });
 
 // Familias
