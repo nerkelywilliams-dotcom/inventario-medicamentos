@@ -78,7 +78,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* LISTA DE VENCIMIENTO */}
+        {/* LISTA DE VENCIMIENTO CORREGIDA */}
         <div className="bg-[#fcfdfe] rounded-[3.5rem] p-12 border border-slate-50 shadow-sm">
           <div className="flex items-center gap-3 mb-10">
             <Clock className="text-[#dc2626] w-7 h-7" />
@@ -94,7 +94,10 @@ export default function Dashboard() {
                       <Pill size={20} className="rotate-45" />
                     </div>
                     <div>
-                      <p className="font-bold text-[#1a2b4b] text-base leading-tight">{med.name}</p>
+                      {/* ✅ CORRECCIÓN: Se usa med.catalog.name en lugar de med.name */}
+                      <p className="font-bold text-[#1a2b4b] text-base leading-tight">
+                        {med.catalog?.name || "Medicamento"}
+                      </p>
                       <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">{med.presentation}</p>
                     </div>
                   </div>
@@ -114,7 +117,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* --- SECCIÓN SINCRONIZADA: BITÁCORA REAL (SOLO PARA ADMINS) --- */}
+      {/* --- SECCIÓN BITÁCORA (SOLO PARA ADMINS) --- */}
       {isAdmin && (
       <div className="bg-white rounded-[3.5rem] p-12 border border-slate-100 shadow-lg shadow-slate-200/50">
         <div className="flex items-center justify-between mb-8">
@@ -128,7 +131,6 @@ export default function Dashboard() {
                 </div>
             </div>
             
-            {/* ✅ CONTENEDOR DE ACCIÓN: Botón "Ver todo" y Spinner de carga */}
             <div className="flex items-center gap-4">
                 {isLoadingLogs && <RefreshCw className="h-4 w-4 animate-spin text-slate-400" />}
                 <Link href="/bitacora">
@@ -150,7 +152,7 @@ export default function Dashboard() {
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
-                    {logs?.slice(0, 5).map((log) => { // Limitamos a 5 para el Dashboard
+                    {logs?.slice(0, 5).map((log) => { 
                       const dateObj = new Date(log.timestamp);
                       const isDateValid = isValid(dateObj);
 
@@ -167,7 +169,8 @@ export default function Dashboard() {
                                 </div>
                             </td>
                             <td className="py-4">
-                                <p className="font-bold text-[#1a2b4b] text-sm">{log.medicationName}</p>
+                                {/* ✅ MEJORA: Se asegura de mostrar el nombre de la bitácora */}
+                                <p className="font-bold text-[#1a2b4b] text-sm uppercase">{log.medicationName}</p>
                                 <p className="text-xs font-medium text-slate-500">
                                     {log.details}
                                 </p>
@@ -189,7 +192,6 @@ export default function Dashboard() {
                       );
                     })}
                     
-                    {/* Mensaje si no hay datos */}
                     {(!logs || logs.length === 0) && (
                       <tr>
                         <td colSpan={4} className="py-10 text-center text-slate-400 font-bold italic">
