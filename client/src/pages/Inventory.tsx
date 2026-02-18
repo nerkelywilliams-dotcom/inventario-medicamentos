@@ -5,7 +5,7 @@ import * as XLSX from "xlsx";
 import { useMedications, useCreateMedication, useUpdateMedication, useDeleteMedication } from "@/hooks/use-medications";
 import { useFamilies } from "@/hooks/use-families";
 import { useAuth } from "@/context/AuthContext";
-import { useCreateLog } from "@/hooks/use-logs"; // ✅ Nuevo hook para la bitácora
+import { useCreateLog } from "@/hooks/use-logs";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -15,7 +15,7 @@ import { MedicationForm } from "@/components/MedicationForm";
 import { MedicationDetail } from "@/components/MedicationDetail";
 import { ExpiryBadge, StockBadge } from "@/components/StatusBadges";
 import { Search, Plus, FileDown, Eye, Pencil, Trash2, FilterX, Tag, Baby } from "lucide-react";
-import { format } from "date-fns";
+import { format, isValid, parseISO } from "date-fns";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
@@ -42,7 +42,7 @@ export default function Inventory() {
   const createMutation = useCreateMedication();
   const updateMutation = useUpdateMedication();
   const deleteMutation = useDeleteMedication();
-  const createLog = useCreateLog(); // ✅ Inicializamos la bitácora
+  const createLog = useCreateLog();
   const { toast } = useToast();
 
   const filteredMedications = medications?.filter(med => {
@@ -72,16 +72,19 @@ export default function Inventory() {
 
   const handleExport = () => {
     if (!medications) return;
-    const data = medications.map(m => ({
-      Nombre: m.catalog?.name || "Sin nombre",
-      Dosis: m.dose,
-      Pediátrico: m.isPediatric ? "Sí" : "No",
-      Familia: m.family?.name || "No asignada",
-      Presentacion: m.presentation,
-      Cantidad: m.quantity,
-      Vencimiento: format(new Date(m.expirationDate), "yyyy-MM-dd"),
-      Estado: m.quantity === 0 ? "Agotado" : m.quantity < 10 ? "Bajo Stock" : "Disponible"
-    }));
+    const data = medications.map(m => {
+      const date = new Date(m.expirationDate);
+      return {
+        Nombre: m.catalog?.name || "Sin nombre",
+        Dosis: m.dose,
+        Pediátrico: m.isPediatric ? "Sí" : "No",
+        Familia: m.family?.name || "No asignada",
+        Presentacion: m.presentation,
+        Cantidad: m.quantity,
+        Vencimiento: isValid(date) ? format(date, "yyyy-MM-dd") : "Fecha inválida",
+        Estado: m.quantity === 0 ? "Agotado" : m.quantity < 10 ? "Bajo Stock" : "Disponible"
+      };
+    });
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Inventario");
@@ -94,7 +97,6 @@ export default function Inventory() {
     if (window.confirm(`¿Estás seguro de eliminar ${medicationToDelete?.catalog?.name}? Esta acción no se puede deshacer.`)) {
       await deleteMutation.mutateAsync(id);
       
-      // ✅ REGISTRO EN BITÁCORA (Eliminación)
       if (user) {
         createLog.mutate({
           action: "ELIMINAR",
@@ -151,7 +153,6 @@ export default function Inventory() {
                   onSubmit={async (data) => {
                     await createMutation.mutateAsync(data);
                     
-                    // ✅ REGISTRO EN BITÁCORA (Creación)
                     if (user) {
                       createLog.mutate({
                         action: "CREAR",
@@ -161,7 +162,7 @@ export default function Inventory() {
                     }
 
                     setIsCreateOpen(false);
-                    toast({ title: "Éxito", description: "Medicamento registrado correctamente en el inventario." });
+                    toast({ title: "Éxito", description: "Medicamento registrado correctamente." });
                   }}
                 />
               </DialogContent>
@@ -194,12 +195,8 @@ export default function Inventory() {
           </Select>
         </div>
         {(search || familyFilter !== "all" || isUrlPediatricFilter) && (
-          <Button asChild={isUrlPediatricFilter} variant="ghost" size="icon" onClick={() => { setSearch(""); setFamilyFilter("all"); }} title="Limpiar filtros">
-            {isUrlPediatricFilter ? (
-              <Link href="/inventory"><FilterX className="h-4 w-4 text-muted-foreground hover:text-destructive" /></Link>
-            ) : (
-              <FilterX className="h-4 w-4 text-muted-foreground hover:text-destructive transition-colors" />
-            )}
+          <Button variant="ghost" size="icon" onClick={() => { setSearch(""); setFamilyFilter("all"); }} title="Limpiar filtros">
+             <FilterX className="h-4 w-4 text-muted-foreground hover:text-destructive transition-colors" />
           </Button>
         )}
       </div>
@@ -243,7 +240,6 @@ export default function Inventory() {
                       <div className="font-semibold text-foreground group-hover:text-primary transition-colors flex items-center gap-2">
                         {med.catalog?.name} 
                         <span className="text-muted-foreground font-normal">({med.dose})</span>
-                        
                         {med.isPediatric && (
                           <Badge variant="outline" className="bg-sky-100 text-sky-700 border-sky-200 text-[10px] font-black uppercase px-2 py-0 h-5 flex items-center gap-0.5 whitespace-nowrap">
                             <Baby className="h-3 w-3" /> Pediátrico
@@ -294,28 +290,26 @@ export default function Inventory() {
                               </DialogHeader>
                               <MedicationForm 
                                 defaultValues={{
-                                  name: med.catalog?.name,
+                                  name: med.catalog?.name ?? "",
                                   dose: med.dose,
                                   presentation: med.presentation,
                                   quantity: med.quantity,
-                                  expirationDate: med.expirationDate,
-                                  description: med.catalog?.description ?? undefined,
-                                  mechanismOfAction: med.catalog?.mechanismOfAction ?? undefined,
-                                  indications: med.catalog?.indications ?? undefined,
-                                  posology: med.catalog?.posology ?? undefined,
-                                  administrationRoute: med.catalog?.administrationRoute ?? undefined,
-                                  contraindications: med.catalog?.contraindications,
-                                  interactions: med.catalog?.interactions,
-                                  isPediatric: med.isPediatric,
+                                  expirationDate: med.expirationDate ?? undefined,
+                                  description: med.catalog?.description ?? "",
+                                  mechanismOfAction: med.catalog?.mechanismOfAction ?? "",
+                                  indications: med.catalog?.indications ?? "",
+                                  posology: med.catalog?.posology ?? "",
+                                  administrationRoute: med.catalog?.administrationRoute ?? "",
+                                  contraindications: med.catalog?.contraindications ?? "",
+                                  interactions: med.catalog?.interactions ?? "",
+                                  isPediatric: med.isPediatric ?? false,
                                   familyId: med.familyId || undefined,
-                                  imageUrl: med.catalog?.imageUrl ?? undefined,
+                                  imageUrl: med.catalog?.imageUrl ?? "",
                                 }}
                                 submitLabel="Guardar Cambios"
                                 isLoading={updateMutation.isPending}
                                 onSubmit={async (data) => {
                                   await updateMutation.mutateAsync({ id: med.id, ...data });
-                                  
-                                  // ✅ REGISTRO EN BITÁCORA (Edición)
                                   if (user) {
                                     createLog.mutate({
                                       action: "EDITAR",
@@ -323,9 +317,8 @@ export default function Inventory() {
                                       userId: user.id
                                     });
                                   }
-
                                   setEditingId(null);
-                                  toast({ title: "Actualizado", description: "Los cambios han sido aplicados con éxito." });
+                                  toast({ title: "Actualizado", description: "Cambios aplicados." });
                                 }}
                               />
                             </DialogContent>

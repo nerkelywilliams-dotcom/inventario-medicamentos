@@ -196,6 +196,13 @@ export async function registerRoutes(
     res.json(catalog);
   });
 
+  // ✅ NUEVA RUTA: Búsqueda específica para autocompletado (La que usa el hook useQuery del frontend)
+  app.get("/api/medication-catalog/search/:name", async (req, res) => {
+    if (!req.user) return res.status(401).json({ message: "No autorizado" });
+    const medication = await storage.getMedicationCatalogBySearch(req.params.name);
+    res.json(medication || null);
+  });
+
   app.get(api.medications.list.path, async (req, res) => {
     if (!req.user) {
       return res.status(401).json({ message: 'No autorizado' });
@@ -225,15 +232,13 @@ export async function registerRoutes(
       };
       const input = insertMedicationFullSchema.parse(body);
 
-      // 1. Verificar si el medicamento ya existe en el catálogo (case-insensitive para evitar duplicados por tildes o mayúsculas)
+      // 1. Verificar si el medicamento ya existe en el catálogo
       let catalogId = null;
       const existingCatalog = await storage.getMedicationCatalogByName(input.name);
       
       if (existingCatalog) {
-        // Reutilizar el catálogo existente
         catalogId = existingCatalog.id;
       } else {
-        // Crear nueva ficha técnica
         const catalogEntry = await storage.createMedicationCatalog({
           name: input.name,
           description: input.description,
@@ -248,7 +253,6 @@ export async function registerRoutes(
         catalogId = catalogEntry.id;
       }
 
-      // 2. Crear el registro físico en el inventario
       const medication = await storage.createMedication({
         dose: input.dose || "Ver empaque",
         presentation: input.presentation,
@@ -261,7 +265,6 @@ export async function registerRoutes(
 
       const completemedication = await storage.getMedication(medication.id);
 
-      // ✅ LOG: Notificar si se reutilizó la ficha o se creó una nueva
       await storage.createLog({
         userId: (req.user as any).id,
         action: "INGRESO",

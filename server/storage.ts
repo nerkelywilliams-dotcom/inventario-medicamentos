@@ -6,16 +6,17 @@ import {
   type User, type InsertUser,
   type Log, type InsertLog, type LogWithUser, type MedicationWithCatalogAndFamily
 } from "@shared/schema";
-import { eq, ilike, and, desc } from "drizzle-orm";
+import { eq, ilike, and, desc, or } from "drizzle-orm";
 
 // Tipo compuesto para inventario con catálogo
 export type MedicationWithFamily = MedicationWithCatalogAndFamily;
 
 export interface IStorage {
   // Medication Catalog
-  getMedicationCatalogs(): Promise<MedicationCatalog[]>; // ✅ AGREGADO
-  getMedicationCatalog(id: number): Promise<MedicationCatalog | undefined>; // ✅ AGREGADO
+  getMedicationCatalogs(): Promise<MedicationCatalog[]>;
+  getMedicationCatalog(id: number): Promise<MedicationCatalog | undefined>;
   getMedicationCatalogByName(name: string): Promise<MedicationCatalog | undefined>;
+  getMedicationCatalogBySearch(searchTerm: string): Promise<MedicationCatalog | undefined>; // ✅ AGREGADO PARA EL AUTOCOMPLETADO
   createMedicationCatalog(catalog: InsertMedicationCatalog): Promise<MedicationCatalog>;
 
   // Families
@@ -45,20 +46,27 @@ export interface IStorage {
 
 export class DatabaseStorage implements IStorage {
   // --- MEDICATION CATALOG ---
-  // ✅ AGREGADO: Obtener todo el catálogo científico
   async getMedicationCatalogs(): Promise<MedicationCatalog[]> {
     return await db.select().from(medicationCatalog).orderBy(medicationCatalog.name);
   }
 
-  // ✅ AGREGADO: Obtener una ficha técnica específica
   async getMedicationCatalog(id: number): Promise<MedicationCatalog | undefined> {
     const [catalog] = await db.select().from(medicationCatalog).where(eq(medicationCatalog.id, id));
     return catalog;
   }
 
   async getMedicationCatalogByName(name: string): Promise<MedicationCatalog | undefined> {
-    // Usamos ilike para que no importe si escribe en mayúsculas o minúsculas
     const [catalog] = await db.select().from(medicationCatalog).where(ilike(medicationCatalog.name, name));
+    return catalog;
+  }
+
+  // ✅ AGREGADO: Lógica de búsqueda para el autocompletado en MedicationForm
+  async getMedicationCatalogBySearch(searchTerm: string): Promise<MedicationCatalog | undefined> {
+    const [catalog] = await db
+      .select()
+      .from(medicationCatalog)
+      .where(ilike(medicationCatalog.name, `%${searchTerm}%`))
+      .limit(1);
     return catalog;
   }
 
