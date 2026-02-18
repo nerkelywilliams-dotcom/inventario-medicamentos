@@ -232,18 +232,22 @@ export async function registerRoutes(
       };
       const input = insertMedicationFullSchema.parse(body);
 
-      // 1. Verificar si el medicamento ya existe en el catálogo (Normalizando nombre)
+      // --- MEJORA: Búsqueda inteligente en catálogo ---
       let catalogId = null;
+      // Normalizamos el nombre para evitar que "Ibuprofeno" e "ibuprofeno " se tomen como distintos
       const normalizedName = input.name.trim();
+      
       const existingCatalog = await storage.getMedicationCatalogByName(normalizedName);
       
       if (existingCatalog) {
+        // REUTILIZACIÓN: Si ya existe el fármaco, usamos su ID
         catalogId = existingCatalog.id;
       } else {
+        // CREACIÓN: Solo si es nuevo, creamos la ficha técnica
         const catalogEntry = await storage.createMedicationCatalog({
           name: normalizedName,
           description: input.description,
-          imageUrl: input.imageUrl,
+          imageUrl: typeof input.imageUrl === 'string' ? input.imageUrl : undefined, // Manejo de imagen
           mechanismOfAction: input.mechanismOfAction,
           indications: input.indications,
           posology: input.posology,
@@ -271,7 +275,7 @@ export async function registerRoutes(
       await storage.createLog({
         userId: (req.user as any).id,
         action: "INGRESO",
-        medicationName: input.name,
+        medicationName: normalizedName,
         details: `${input.presentation} (${input.dose}). ${existingCatalog ? 'Ficha técnica reutilizada.' : 'Ficha técnica nueva creada.'}`
       });
 
