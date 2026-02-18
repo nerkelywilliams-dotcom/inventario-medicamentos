@@ -189,14 +189,14 @@ export async function registerRoutes(
 
   // --- MEDICATIONS ---
   
-  // ✅ NUEVA RUTA: Ver todo el catálogo científico (Para que usted "vea" el catálogo)
+  // ✅ NUEVA RUTA: Ver todo el catálogo científico
   app.get('/api/medication-catalog', async (req, res) => {
     if (!req.user) return res.status(401).json({ message: 'No autorizado' });
     const catalog = await storage.getMedicationCatalogs();
     res.json(catalog);
   });
 
-  // ✅ NUEVA RUTA: Búsqueda específica para autocompletado (La que usa el hook useQuery del frontend)
+  // ✅ NUEVA RUTA: Búsqueda específica para autocompletado
   app.get("/api/medication-catalog/search/:name", async (req, res) => {
     if (!req.user) return res.status(401).json({ message: "No autorizado" });
     const medication = await storage.getMedicationCatalogBySearch(req.params.name);
@@ -232,15 +232,16 @@ export async function registerRoutes(
       };
       const input = insertMedicationFullSchema.parse(body);
 
-      // 1. Verificar si el medicamento ya existe en el catálogo
+      // 1. Verificar si el medicamento ya existe en el catálogo (Normalizando nombre)
       let catalogId = null;
-      const existingCatalog = await storage.getMedicationCatalogByName(input.name);
+      const normalizedName = input.name.trim();
+      const existingCatalog = await storage.getMedicationCatalogByName(normalizedName);
       
       if (existingCatalog) {
         catalogId = existingCatalog.id;
       } else {
         const catalogEntry = await storage.createMedicationCatalog({
-          name: input.name,
+          name: normalizedName,
           description: input.description,
           imageUrl: input.imageUrl,
           mechanismOfAction: input.mechanismOfAction,
@@ -253,6 +254,7 @@ export async function registerRoutes(
         catalogId = catalogEntry.id;
       }
 
+      // 2. Crear la entrada en el inventario (Lote específico)
       const medication = await storage.createMedication({
         dose: input.dose || "Ver empaque",
         presentation: input.presentation,
@@ -265,6 +267,7 @@ export async function registerRoutes(
 
       const completemedication = await storage.getMedication(medication.id);
 
+      // 3. Registrar en la bitácora
       await storage.createLog({
         userId: (req.user as any).id,
         action: "INGRESO",
