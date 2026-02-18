@@ -64,7 +64,6 @@ export const logs = pgTable("logs", {
 
 // --- RELACIONES (Drizzle Relations) ---
 
-// 1. Relación Catálogo <-> Medicamentos (Maestro-Detalle)
 export const medicationCatalogRelations = relations(medicationCatalog, ({ many }) => ({
   medications: many(medications),
 }));
@@ -80,12 +79,10 @@ export const medicationsRelations = relations(medications, ({ one }) => ({
   }),
 }));
 
-// 2. Relación Familias <-> Medicamentos
 export const familiesRelations = relations(families, ({ many }) => ({
   medications: many(medications),
 }));
 
-// 3. Relación Usuarios <-> Logs
 export const usersRelations = relations(users, ({ many }) => ({
   logs: many(logs),
 }));
@@ -99,13 +96,11 @@ export const logsRelations = relations(logs, ({ one }) => ({
 
 // --- ESQUEMAS DE VALIDACIÓN (ZOD) ---
 
-// Catálogo de Medicamentos (Información Científica)
 export const insertMedicationCatalogSchema = createInsertSchema(medicationCatalog).omit({ 
   id: true, 
   createdAt: true,
 });
 
-// Medicamentos (Inventario)
 export const insertMedicationSchema = createInsertSchema(medications).omit({ 
   id: true, 
   createdAt: true, 
@@ -113,13 +108,15 @@ export const insertMedicationSchema = createInsertSchema(medications).omit({
   catalogId: true, 
 });
 
-// --- AQUÍ ESTÁ LA CORRECCIÓN IMPORTANTE ---
-// Esquema combinado para crear medicamentos (usado en API y Formulario)
+// --- ESQUEMA FULL CORREGIDO (EL QUE USA EL FORMULARIO) ---
 export const insertMedicationFullSchema = z.object({
-  // Campos del catálogo de medicamentos
+  // Campos del catálogo
   name: z.string().min(1, "El nombre del medicamento es requerido"),
   description: z.string().optional(),
-  imageUrl: z.string().optional(),
+  
+  // CAMBIO CLAVE: imageUrl ahora acepta cualquier tipo (File o String) para evitar el error de validación
+  imageUrl: z.any().optional(), 
+  
   mechanismOfAction: z.string().optional(),
   indications: z.string().optional(),
   posology: z.string().optional(),
@@ -127,17 +124,14 @@ export const insertMedicationFullSchema = z.object({
   contraindications: z.string().optional(),
   interactions: z.string().optional(),
   
-  // Campos específicos del inventario
+  // Campos de inventario
   dose: z.string().optional().default("Ver empaque"),
   presentation: z.string().min(1, "La presentación es requerida"),
   
-  // CORRECCIÓN: Usamos z.coerce.number() para transformar texto a número automáticamente
+  // Coerción para números (lo que ya tenías corregido)
   quantity: z.coerce.number().int().min(0, "El stock no puede ser negativo").default(0),
-  
-  expirationDate: z.coerce.date(), // Convierte string de fecha a objeto Date
+  expirationDate: z.coerce.date(), 
   isPediatric: z.boolean().optional().default(false),
-  
-  // CORRECCIÓN: También aplicamos coerción aquí por si el select envía un string
   familyId: z.coerce.number().int().optional(),
 });
 
@@ -156,28 +150,21 @@ export const insertLogSchema = createInsertSchema(logs).omit({
   timestamp: true 
 });
 
-// Login Manual (Validación de formulario)
+// Login
 export const loginSchema = z.object({
   username: z.string().min(1, 'El usuario es requerido'),
   password: z.string().min(1, 'La contraseña es requerida'),
 });
 
-// --- TIPOS EXPORTADOS (TYPESCRIPT) ---
-
-// Familias
+// --- TIPOS EXPORTADOS ---
 export type Family = typeof families.$inferSelect;
 export type InsertFamily = z.infer<typeof insertFamilySchema>;
-
-// Catálogo de Medicamentos
 export type MedicationCatalog = typeof medicationCatalog.$inferSelect;
 export type InsertMedicationCatalog = z.infer<typeof insertMedicationCatalogSchema>;
-
-// Medicamentos (Inventario)
 export type Medication = typeof medications.$inferSelect;
 export type InsertMedication = z.infer<typeof insertMedicationSchema>;
 export type InsertMedicationFull = z.infer<typeof insertMedicationFullSchema>;
 
-// Tipos compuestos para la API
 export type MedicationWithCatalog = Medication & {
   catalog: MedicationCatalog;
 };
@@ -186,20 +173,13 @@ export type MedicationWithCatalogAndFamily = MedicationWithCatalog & {
   family?: Family;
 };
 
-// Tipo heredado para compatibilidad
 export type MedicationWithFamily = MedicationWithCatalogAndFamily;
-
-// Usuarios
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
-
-// Logs
 export type Log = typeof logs.$inferSelect;
 export type InsertLog = z.infer<typeof insertLogSchema>;
 export type LogWithUser = Log & {
   user: User; 
 };
-
-// Login Response
 export type LoginRequest = z.infer<typeof loginSchema>;
 export type LoginResponse = Omit<User, 'password'>;
