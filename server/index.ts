@@ -23,15 +23,18 @@ declare module "http" {
   }
 }
 
+// ✅ CORRECCIÓN: Se añade 'limit' para permitir fotos de medicamentos pesadas (10MB)
 app.use(
   express.json({
+    limit: "10mb", 
     verify: (req, _res, buf) => {
       req.rawBody = buf;
     },
   }),
 );
 
-app.use(express.urlencoded({ extended: false }));
+// ✅ CORRECCIÓN: Se añade 'limit' también aquí para formularios extensos
+app.use(express.urlencoded({ limit: "10mb", extended: false }));
 
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
@@ -89,7 +92,7 @@ async function seedAdminUser() {
       username: "admin_mag",
       password: hashedPassword,
       role: "admin",
-      inventoryLocation: "SSIA Magdaleno", // ✅ Corregido según image_9b7dc4.jpg
+      inventoryLocation: "SSIA Magdaleno", 
     });
     
     console.log("✅ ¡ÉXITO! El usuario 'admin_mag' ha sido re-creado con admin123.");
