@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { insertMedicationFullSchema, type InsertMedicationFull, type Medication } from "@shared/schema";
@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { Switch } from "@/components/ui/switch";
-import { Loader2, X, Pill, Activity, AlertOctagon, RefreshCw, Baby, Sparkles, CheckCircle2, Image as ImageIcon } from "lucide-react";
+import { Loader2, X, Pill, Activity, AlertOctagon, RefreshCw, Baby, Sparkles, CheckCircle2, Image as ImageIcon, Trash2 } from "lucide-react";
 import { z } from "zod";
 import { useQuery } from "@tanstack/react-query";
 
@@ -33,9 +33,10 @@ export function MedicationForm({ defaultValues, onSubmit, isLoading, submitLabel
   const [isCustomVia, setIsCustomVia] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   
-  // ✅ ESTADOS PARA EL PROGRESO DE CARGA
+  // ✅ ESTADOS PARA CARGA Y VISTA PREVIA
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(defaultValues?.imageUrl || null);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -68,7 +69,6 @@ export function MedicationForm({ defaultValues, onSubmit, isLoading, submitLabel
   const handleAutofill = () => {
     if (!existingCatalog) return;
     const catalog = existingCatalog as any;
-
     if (catalog.familyId) form.setValue("familyId", catalog.familyId);
     form.setValue("description", catalog.description || "");
     form.setValue("mechanismOfAction", catalog.mechanismOfAction || "");
@@ -87,6 +87,7 @@ export function MedicationForm({ defaultValues, onSubmit, isLoading, submitLabel
     };
 
     const file = data.imageUrl;
+    // Si es un archivo nuevo, lo convertimos a Base64 para el backend
     if (file instanceof File) {
       const reader = new FileReader();
       reader.onloadend = () => {
@@ -102,6 +103,7 @@ export function MedicationForm({ defaultValues, onSubmit, isLoading, submitLabel
     <Form {...form}>
       <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* NOMBRE COMERCIAL Y AUTOCOMPLETADO */}
           <FormField
             control={form.control}
             name="name"
@@ -111,32 +113,23 @@ export function MedicationForm({ defaultValues, onSubmit, isLoading, submitLabel
                   <Pill className="h-4 w-4 text-primary" /> Nombre Comercial
                 </FormLabel>
                 <FormControl>
-                  <div className="relative">
-                    <Input 
-                      placeholder="Ej. Paracetamol, Ibuprofeno..." 
-                      {...field} 
-                      value={field.value ?? ""} 
-                      onChange={(e) => {
-                        field.onChange(e);
-                        setSearchTerm(e.target.value);
-                      }}
-                    />
-                  </div>
+                  <Input 
+                    placeholder="Ej. Paracetamol, Ibuprofeno..." 
+                    {...field} 
+                    value={field.value ?? ""} 
+                    onChange={(e) => {
+                      field.onChange(e);
+                      setSearchTerm(e.target.value);
+                    }}
+                  />
                 </FormControl>
-                
                 {existingCatalog && (
                   <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-center justify-between animate-in slide-in-from-top-2 duration-300 shadow-sm">
                     <div className="flex items-center gap-2 text-blue-800 text-sm">
                       <Sparkles className="h-4 w-4 text-blue-500 fill-blue-500" />
                       <span>Ficha encontrada para <strong>{(existingCatalog as any).name}</strong></span>
                     </div>
-                    <Button 
-                      type="button" 
-                      variant="outline" 
-                      size="sm" 
-                      onClick={handleAutofill}
-                      className="h-7 text-xs bg-white border-blue-300 text-blue-700 hover:bg-blue-100 font-bold"
-                    >
+                    <Button type="button" variant="outline" size="sm" onClick={handleAutofill} className="h-7 text-xs bg-white border-blue-300 text-blue-700 hover:bg-blue-100 font-bold">
                       <CheckCircle2 className="mr-1 h-3 w-3" /> Autocompletar
                     </Button>
                   </div>
@@ -151,12 +144,8 @@ export function MedicationForm({ defaultValues, onSubmit, isLoading, submitLabel
             name="dose"
             render={({ field }) => (
               <FormItem className="bg-primary/5 p-3 rounded-lg border border-primary/10">
-                <FormLabel className="flex items-center gap-2 text-primary font-bold">
-                  <Activity className="h-4 w-4" /> Dosis
-                </FormLabel>
-                <FormControl>
-                  <Input placeholder="500mg, 1gr..." {...field} value={field.value ?? ""} className="bg-white" />
-                </FormControl>
+                <FormLabel className="flex items-center gap-2 text-primary font-bold"><Activity className="h-4 w-4" /> Dosis</FormLabel>
+                <FormControl><Input placeholder="500mg, 1gr..." {...field} value={field.value ?? ""} className="bg-white" /></FormControl>
                 <FormMessage />
               </FormItem>
             )}
@@ -168,17 +157,11 @@ export function MedicationForm({ defaultValues, onSubmit, isLoading, submitLabel
             render={({ field }) => (
               <FormItem className="flex flex-row items-center justify-between rounded-xl border-2 border-sky-100 p-4 bg-sky-50/50 shadow-sm transition-all hover:bg-white md:col-span-1">
                 <div className="space-y-0.5">
-                  <FormLabel className="text-sm font-black text-sky-900 flex items-center gap-2">
-                    <Baby className="h-4 w-4 text-sky-500" /> ¿PEDIÁTRICO?
-                  </FormLabel>
-                  <FormDescription className="text-[10px] leading-tight text-sky-600/80 font-medium">
-                    Solo uso infantil.
-                  </FormDescription>
+                  <FormLabel className="text-sm font-black text-sky-900 flex items-center gap-2"><Baby className="h-4 w-4 text-sky-500" /> ¿PEDIÁTRICO?</FormLabel>
+                  <FormDescription className="text-[10px] leading-tight text-sky-600/80 font-medium">Solo uso infantil.</FormDescription>
                 </div>
                 <FormControl>
-                  <span className="cursor-pointer">
-                    <Switch checked={field.value} onCheckedChange={field.onChange} className="data-[state=checked]:bg-sky-500" />
-                  </span>
+                  <Switch checked={field.value} onCheckedChange={field.onChange} className="data-[state=checked]:bg-sky-500" />
                 </FormControl>
               </FormItem>
             )}
@@ -233,9 +216,7 @@ export function MedicationForm({ defaultValues, onSubmit, isLoading, submitLabel
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Stock</FormLabel>
-                  <FormControl>
-                    <Input type="number" {...field} value={field.value ?? 0} onChange={e => field.onChange(parseInt(e.target.value) || 0)} />
-                  </FormControl>
+                  <FormControl><Input type="number" {...field} value={field.value ?? 0} onChange={e => field.onChange(parseInt(e.target.value) || 0)} /></FormControl>
                   <FormMessage />
                 </FormItem>
               )}
@@ -246,9 +227,7 @@ export function MedicationForm({ defaultValues, onSubmit, isLoading, submitLabel
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Vencimiento</FormLabel>
-                  <FormControl>
-                    <Input type="date" {...field} value={field.value instanceof Date ? field.value.toISOString().split('T')[0] : (field.value ?? "")} />
-                  </FormControl>
+                  <FormControl><Input type="date" {...field} value={field.value instanceof Date ? field.value.toISOString().split('T')[0] : (field.value ?? "")} /></FormControl>
                   <FormMessage />
                 </FormItem>
               )}
@@ -284,41 +263,66 @@ export function MedicationForm({ defaultValues, onSubmit, isLoading, submitLabel
               )}
             />
             
+            {/* ✅ FOTO CON VISTA PREVIA Y BARRA DE PROGRESO */}
             <FormField
               control={form.control}
               name="imageUrl"
-              render={({ field: { onChange } }) => (
+              render={({ field: { onChange, value } }) => (
                 <FormItem>
-                  <FormLabel className="flex items-center gap-2 font-bold">
-                    <ImageIcon className="h-4 w-4 text-blue-500" /> Foto del empaque
-                  </FormLabel>
+                  <FormLabel className="flex items-center gap-2 font-bold"><ImageIcon className="h-4 w-4 text-blue-500" /> Foto del empaque</FormLabel>
                   <FormControl>
                     <div className="space-y-3">
-                      <Input 
-                        type="file" 
-                        accept="image/*" 
-                        className="cursor-pointer"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) {
-                            onChange(file);
-                            // Iniciar simulación de progreso
-                            setIsUploading(true);
-                            setUploadProgress(0);
-                            const interval = setInterval(() => {
-                              setUploadProgress((prev) => {
-                                if (prev >= 100) {
-                                  clearInterval(interval);
-                                  return 100;
-                                }
-                                return prev + 10;
-                              });
-                            }, 100);
-                          }
-                        }} 
-                      />
+                      {/* MINIATURA DE VISTA PREVIA */}
+                      {previewUrl && (
+                        <div className="relative w-40 h-28 rounded-lg border-2 border-dashed border-slate-300 overflow-hidden bg-slate-50 group">
+                          <img src={previewUrl} alt="Preview" className="w-full h-full object-cover transition-transform group-hover:scale-105" />
+                          <Button 
+                            type="button" 
+                            variant="destructive" 
+                            size="icon" 
+                            className="absolute top-1 right-1 h-6 w-6 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                            onClick={() => {
+                              setPreviewUrl(null);
+                              onChange(null);
+                            }}
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      )}
+
+                      {!previewUrl && (
+                        <Input 
+                          type="file" 
+                          accept="image/*" 
+                          className="cursor-pointer"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              onChange(file);
+                              
+                              // Generar Preview
+                              const reader = new FileReader();
+                              reader.onloadend = () => setPreviewUrl(reader.result as string);
+                              reader.readAsDataURL(file);
+
+                              // Simulación de barra de progreso
+                              setIsUploading(true);
+                              setUploadProgress(0);
+                              const interval = setInterval(() => {
+                                setUploadProgress((prev) => {
+                                  if (prev >= 100) {
+                                    clearInterval(interval);
+                                    return 100;
+                                  }
+                                  return prev + 10;
+                                });
+                              }, 100);
+                            }
+                          }} 
+                        />
+                      )}
                       
-                      {/* ✅ BARRA DE PROGRESO MANUAL CON TAILWIND */}
                       {isUploading && (
                         <div className="p-3 border rounded-lg bg-slate-50 animate-in fade-in duration-500">
                           <div className="flex justify-between items-center mb-2">
@@ -331,13 +335,8 @@ export function MedicationForm({ defaultValues, onSubmit, isLoading, submitLabel
                             </span>
                             <span className="text-xs font-black text-blue-600">{uploadProgress}%</span>
                           </div>
-                          
-                          {/* Contenedor de la barra */}
                           <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
-                            <div 
-                              className="bg-blue-600 h-full rounded-full transition-all duration-300 ease-out shadow-[0_0_8px_rgba(37,99,235,0.4)]" 
-                              style={{ width: `${uploadProgress}%` }}
-                            ></div>
+                            <div className="bg-blue-600 h-full rounded-full transition-all duration-300 ease-out shadow-[0_0_8px_rgba(37,99,235,0.4)]" style={{ width: `${uploadProgress}%` }}></div>
                           </div>
                         </div>
                       )}
