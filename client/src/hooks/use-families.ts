@@ -4,14 +4,14 @@ import { queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/context/AuthContext";
 
 /**
- * Hook para obtener todas las familias farmacéuticas
+ * Hook unificado para la gestión de familias farmacológicas
  */
 export function useFamilies() {
   const { user } = useAuth();
 
-  return useQuery<Family[]>({
+  // 1. Consulta de datos (Obtener todas las familias)
+  const query = useQuery<Family[]>({
     queryKey: ["/api/families"],
-    // Agregamos queryFn para enviar el header de autorización al visualizar
     queryFn: async () => {
       const res = await fetch("/api/families", {
         headers: {
@@ -23,18 +23,11 @@ export function useFamilies() {
       }
       return res.json();
     },
-    // Solo se ejecuta si hay un usuario logueado
     enabled: !!user, 
   });
-}
 
-/**
- * Hook para crear una nueva familia
- */
-export function useCreateFamily() {
-  const { user } = useAuth();
-
-  return useMutation({
+  // 2. Mutación para crear
+  const createFamily = useMutation({
     mutationFn: async (data: InsertFamily) => {
       const res = await fetch("/api/families", {
         method: "POST",
@@ -52,20 +45,13 @@ export function useCreateFamily() {
       return res.json();
     },
     onSuccess: () => {
-      // Refresca la lista automáticamente en la UI
       queryClient.invalidateQueries({ queryKey: ["/api/families"] });
     },
   });
-}
 
-/**
- * Hook para actualizar una familia existente
- */
-export function useUpdateFamily() {
-  const { user } = useAuth();
-
-  return useMutation({
-    mutationFn: async ({ id, ...data }: InsertFamily & { id: number }) => {
+  // 3. Mutación para actualizar (Editar)
+  const updateFamily = useMutation({
+    mutationFn: async ({ id, ...data }: Partial<InsertFamily> & { id: number }) => {
       const res = await fetch(`/api/families/${id}`, {
         method: "PATCH",
         headers: {
@@ -82,15 +68,9 @@ export function useUpdateFamily() {
       queryClient.invalidateQueries({ queryKey: ["/api/families"] });
     },
   });
-}
 
-/**
- * Hook para eliminar una familia
- */
-export function useDeleteFamily() {
-  const { user } = useAuth();
-
-  return useMutation({
+  // 4. Mutación para eliminar
+  const deleteFamily = useMutation({
     mutationFn: async (id: number) => {
       const res = await fetch(`/api/families/${id}`, {
         method: "DELETE",
@@ -104,4 +84,19 @@ export function useDeleteFamily() {
       queryClient.invalidateQueries({ queryKey: ["/api/families"] });
     },
   });
+
+  // Retornamos todo en un solo objeto para que la página lo consuma fácilmente
+  return {
+    families: query.data ?? [],
+    isLoading: query.isLoading,
+    error: query.error,
+    createFamily,
+    updateFamily,
+    deleteFamily
+  };
 }
+
+// Mantengo estos exports individuales por si otros componentes los usan por separado
+export function useCreateFamily() { return useFamilies().createFamily; }
+export function useUpdateFamily() { return useFamilies().updateFamily; }
+export function useDeleteFamily() { return useFamilies().deleteFamily; }
