@@ -1,5 +1,3 @@
-"use client"
-
 import { useState, useMemo } from "react";
 import { useFamilies } from "@/hooks/use-families";
 import { useMedications } from "@/hooks/use-medications";
@@ -8,47 +6,25 @@ import { Input } from "@/components/ui/input";
 import { FamilyCard } from "@/components/FamilyCard";
 import { FamilyForm } from "@/components/FamilyForm";
 import { useToast } from "@/hooks/use-toast";
-import { 
-  Plus, 
-  Search, 
-  SortAsc, 
-  SortDesc, 
-  History, 
-  BarChart3, 
-  AlertCircle,
-  Loader2 
-} from "lucide-react";
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogHeader, 
-  DialogTitle, 
-  DialogTrigger 
-} from "@/components/ui/dialog";
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
-} from "@/components/ui/select";
-
-type SortOption = "az" | "za" | "most_used" | "newest";
+import { Plus, Search, SortAsc, Loader2, AlertCircle } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export default function FamiliesPage() {
-  const { families = [], createFamily, isLoading } = useFamilies();
-  const { medications = [] } = useMedications();
+  const { families, createFamily, isLoading: loadingFamilies } = useFamilies();
+  const { medications, isLoading: loadingMeds } = useMedications();
   const { toast } = useToast();
   
   const [searchTerm, setSearchTerm] = useState("");
-  const [sortBy, setSortBy] = useState<SortOption>("newest");
+  const [sortBy, setSortBy] = useState("newest");
   const [isOpen, setIsOpen] = useState(false);
 
-  // ✅ LÓGICA DE FILTRADO CON "OPTIONAL CHAINING" PARA EVITAR CRASHES
-  const filteredAndSortedFamilies = useMemo(() => {
-    if (!Array.isArray(families)) return [];
+  // 🛡️ Protección contra datos nulos o indefinidos
+  const safeFamilies = Array.isArray(families) ? families : [];
+  const safeMedications = Array.isArray(medications) ? medications : [];
 
-    let result = families.filter(f => {
+  const filteredAndSortedFamilies = useMemo(() => {
+    let result = safeFamilies.filter(f => {
       const name = f?.name?.toLowerCase() || "";
       const desc = f?.description?.toLowerCase() || "";
       const search = searchTerm.toLowerCase();
@@ -56,111 +32,81 @@ export default function FamiliesPage() {
     });
 
     return [...result].sort((a, b) => {
-      switch (sortBy) {
-        case "az":
-          return (a?.name || "").localeCompare(b?.name || "");
-        case "za":
-          return (b?.name || "").localeCompare(a?.name || "");
-        case "newest":
-          return (Number(b?.id) || 0) - (Number(a?.id) || 0);
-        case "most_used":
-          const countA = medications?.filter(m => m.familyId === a.id).length || 0;
-          const countB = medications?.filter(m => m.familyId === b.id).length || 0;
-          return countB - countA;
-        default:
-          return 0;
+      if (sortBy === "az") return (a.name || "").localeCompare(b.name || "");
+      if (sortBy === "za") return (b.name || "").localeCompare(a.name || "");
+      if (sortBy === "most_used") {
+        const countA = safeMedications.filter(m => m.familyId === a.id).length;
+        const countB = safeMedications.filter(m => m.familyId === b.id).length;
+        return countB - countA;
       }
+      return (b.id || 0) - (a.id || 0);
     });
-  }, [families, searchTerm, sortBy, medications]);
+  }, [safeFamilies, searchTerm, sortBy, safeMedications]);
 
   const handleCreateFamily = async (data: any) => {
-    const nameNormalized = data.name?.trim().toLowerCase();
-    const alreadyExists = families?.some(
-      (f) => f.name?.trim().toLowerCase() === nameNormalized
-    );
-
-    if (alreadyExists) {
-      toast({
-        title: "Familia ya registrada",
-        description: `"${data.name}" ya existe.`,
-        variant: "destructive",
-      });
-      return;
-    }
-
     try {
       await createFamily.mutateAsync(data);
       setIsOpen(false);
-      toast({ title: "¡Éxito!", description: "Familia creada correctamente." });
+      toast({ title: "Éxito", description: "Familia creada." });
     } catch (e) {
       toast({ title: "Error", description: "No se pudo crear.", variant: "destructive" });
     }
   };
 
-  if (isLoading) {
+  // 🏥 Si está cargando, mostramos un spinner en lugar de pantalla blanca
+  if (loadingFamilies || loadingMeds) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[400px]">
-        <Loader2 className="h-10 w-10 animate-spin text-primary/50" />
-        <p className="text-slate-400 mt-4">Cargando grupos terapéuticos...</p>
+      <div className="flex h-screen items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <span className="ml-2">Cargando MediStock...</span>
       </div>
     );
   }
 
   return (
-    <div className="p-4 md:p-8 space-y-6">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <h1 className="text-3xl font-black text-[#1a2b4b]">Familias Farmacológicas</h1>
-          <p className="text-slate-500">Gestión de categorías del inventario.</p>
-        </div>
-
+    <div className="p-8 space-y-6">
+      <div className="flex justify-between items-center">
+        <h1 className="text-3xl font-bold text-[#1a2b4b]">Familias Farmacológicas</h1>
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
           <DialogTrigger asChild>
-            <Button className="font-bold shadow-lg"><Plus className="mr-2 h-5 w-5" /> Nueva Familia</Button>
+            <Button><Plus className="mr-2 h-4 w-4" /> Nueva Familia</Button>
           </DialogTrigger>
           <DialogContent>
-            <DialogHeader><DialogTitle>Registrar Grupo</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle>Nueva Familia</DialogTitle></DialogHeader>
             <FamilyForm onSubmit={handleCreateFamily} isLoading={createFamily.isPending} />
           </DialogContent>
         </Dialog>
       </div>
 
-      <div className="flex flex-col md:flex-row gap-4 bg-white p-4 rounded-xl shadow-sm border border-slate-100">
+      <div className="flex gap-4 bg-white p-4 rounded-lg shadow-sm">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
           <Input 
-            placeholder="Buscar familia..." 
+            placeholder="Buscar..." 
             className="pl-10" 
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-        <Select value={sortBy} onValueChange={(val: any) => setSortBy(val)}>
-          <SelectTrigger className="w-full md:w-56">
-            <SortAsc className="mr-2 h-4 w-4 text-primary" />
-            <SelectValue placeholder="Ordenar" />
+        <Select value={sortBy} onValueChange={setSortBy}>
+          <SelectTrigger className="w-[200px]">
+            <SortAsc className="mr-2 h-4 w-4" />
+            <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="newest">Recientes</SelectItem>
-            <SelectItem value="az">A-Z</SelectItem>
-            <SelectItem value="za">Z-A</SelectItem>
+            <SelectItem value="newest">Más recientes</SelectItem>
+            <SelectItem value="az">A - Z</SelectItem>
+            <SelectItem value="za">Z - A</SelectItem>
             <SelectItem value="most_used">Más utilizados</SelectItem>
           </SelectContent>
         </Select>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {filteredAndSortedFamilies.map((family) => (
           <FamilyCard key={family.id} family={family} />
         ))}
       </div>
-
-      {filteredAndSortedFamilies.length === 0 && (
-        <div className="text-center py-20 bg-slate-50 rounded-2xl border-2 border-dashed">
-          <AlertCircle className="mx-auto h-12 w-12 text-slate-300" />
-          <p className="text-slate-500 mt-2">No se encontraron resultados.</p>
-        </div>
-      )}
     </div>
   );
 }
