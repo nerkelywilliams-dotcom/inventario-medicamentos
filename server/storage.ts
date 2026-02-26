@@ -18,6 +18,7 @@ export interface IStorage {
   getMedicationCatalogByName(name: string): Promise<MedicationCatalog | undefined>;
   getMedicationCatalogBySearch(searchTerm: string): Promise<MedicationCatalog | undefined>; // ✅ AGREGADO PARA EL AUTOCOMPLETADO
   createMedicationCatalog(catalog: InsertMedicationCatalog): Promise<MedicationCatalog>;
+  updateMedicationCatalog(id: number, catalog: Partial<InsertMedicationCatalog>): Promise<MedicationCatalog | undefined>; // ✅ NUEVO: Para actualizar fotos y textos
 
   // Families
   getFamilies(inventoryLocation?: string): Promise<Family[]>;
@@ -72,6 +73,16 @@ export class DatabaseStorage implements IStorage {
 
   async createMedicationCatalog(insertCatalog: InsertMedicationCatalog): Promise<MedicationCatalog> {
     const [catalog] = await db.insert(medicationCatalog).values(insertCatalog).returning();
+    return catalog;
+  }
+
+  // ✅ NUEVO: Implementación para actualizar el catálogo (imágenes, descripciones, etc.)
+  async updateMedicationCatalog(id: number, updates: Partial<InsertMedicationCatalog>): Promise<MedicationCatalog | undefined> {
+    const [catalog] = await db
+      .update(medicationCatalog)
+      .set(updates)
+      .where(eq(medicationCatalog.id, id))
+      .returning();
     return catalog;
   }
 

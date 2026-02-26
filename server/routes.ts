@@ -57,7 +57,7 @@ export async function registerRoutes(
     }
   });
 
-  // ✅ NUEVA RUTA: Obtener Logs para la bitácora (SOLO PARA ADMINS)
+  // ✅ RUTA: Obtener Logs para la bitácora (SOLO PARA ADMINS)
   app.get('/api/logs', async (req, res) => {
     if (!req.user) return res.status(401).json({ message: 'No autorizado' });
     if (req.user.role !== 'admin') {
@@ -189,14 +189,12 @@ export async function registerRoutes(
 
   // --- MEDICATIONS ---
   
-  // ✅ NUEVA RUTA: Ver todo el catálogo científico
   app.get('/api/medication-catalog', async (req, res) => {
     if (!req.user) return res.status(401).json({ message: 'No autorizado' });
     const catalog = await storage.getMedicationCatalogs();
     res.json(catalog);
   });
 
-  // ✅ NUEVA RUTA: Búsqueda específica para autocompletado
   app.get("/api/medication-catalog/search/:name", async (req, res) => {
     if (!req.user) return res.status(401).json({ message: "No autorizado" });
     const medication = await storage.getMedicationCatalogBySearch(req.params.name);
@@ -232,22 +230,18 @@ export async function registerRoutes(
       };
       const input = insertMedicationFullSchema.parse(body);
 
-      // --- MEJORA: Búsqueda inteligente en catálogo ---
       let catalogId = null;
-      // Normalizamos el nombre para evitar que "Ibuprofeno" e "ibuprofeno " se tomen como distintos
       const normalizedName = input.name.trim();
       
       const existingCatalog = await storage.getMedicationCatalogByName(normalizedName);
       
       if (existingCatalog) {
-        // REUTILIZACIÓN: Si ya existe el fármaco, usamos su ID
         catalogId = existingCatalog.id;
       } else {
-        // CREACIÓN: Solo si es nuevo, creamos la ficha técnica
         const catalogEntry = await storage.createMedicationCatalog({
           name: normalizedName,
           description: input.description,
-          imageUrl: typeof input.imageUrl === 'string' ? input.imageUrl : undefined, // Manejo de imagen
+          imageUrl: typeof input.imageUrl === 'string' ? input.imageUrl : undefined,
           mechanismOfAction: input.mechanismOfAction,
           indications: input.indications,
           posology: input.posology,
@@ -258,7 +252,6 @@ export async function registerRoutes(
         catalogId = catalogEntry.id;
       }
 
-      // 2. Crear la entrada en el inventario (Lote específico)
       const medication = await storage.createMedication({
         dose: input.dose || "Ver empaque",
         presentation: input.presentation,
@@ -271,7 +264,6 @@ export async function registerRoutes(
 
       const completemedication = await storage.getMedication(medication.id);
 
-      // 3. Registrar en la bitácora
       await storage.createLog({
         userId: (req.user as any).id,
         action: "INGRESO",
@@ -291,17 +283,23 @@ export async function registerRoutes(
     }
   });
 
+  // ✅ CORRECCIÓN PRINCIPAL: Actualizar tanto el lote como la ficha técnica (imagen)
   app.put(api.medications.update.path, async (req, res) => {
     if (!req.user) return res.status(401).json({ message: 'No autorizado' });
     try {
       const id = Number(req.params.id);
       const oldMed = await storage.getMedication(id);
 
+      if (!oldMed) {
+        return res.status(404).json({ message: 'Medication not found' });
+      }
+
       const body = {
         ...req.body,
         expirationDate: req.body.expirationDate ? new Date(req.body.expirationDate) : undefined
       };
       
+      // 1. Actualizar los datos del LOTE (Inventario)
       const updateFields: any = {};
       if (body.dose !== undefined) updateFields.dose = body.dose;
       if (body.presentation !== undefined) updateFields.presentation = body.presentation;
@@ -312,13 +310,28 @@ export async function registerRoutes(
 
       const medication = await storage.updateMedication(id, updateFields);
       
-      if (!medication) {
-        return res.status(404).json({ message: 'Medication not found' });
+      // 2. Actualizar los datos del CATÁLOGO (Imágenes y textos médicos)
+      if (oldMed.catalogId) {
+        const catalogUpdateFields: any = {};
+        if (body.name !== undefined) catalogUpdateFields.name = body.name.trim();
+        if (body.description !== undefined) catalogUpdateFields.description = body.description;
+        if (body.imageUrl !== undefined) catalogUpdateFields.imageUrl = body.imageUrl; // ✅ Aquí guardamos la foto
+        if (body.mechanismOfAction !== undefined) catalogUpdateFields.mechanismOfAction = body.mechanismOfAction;
+        if (body.indications !== undefined) catalogUpdateFields.indications = body.indications;
+        if (body.posology !== undefined) catalogUpdateFields.posology = body.posology;
+        if (body.administrationRoute !== undefined) catalogUpdateFields.administrationRoute = body.administrationRoute;
+        if (body.contraindications !== undefined) catalogUpdateFields.contraindications = body.contraindications;
+        if (body.interactions !== undefined) catalogUpdateFields.interactions = body.interactions;
+
+        if (Object.keys(catalogUpdateFields).length > 0) {
+          await storage.updateMedicationCatalog(oldMed.catalogId, catalogUpdateFields);
+        }
       }
 
+      // 3. Registro en la bitácora
       if (oldMed) {
         let action = "ACTUALIZACIÓN";
-        let details = "Datos de lote actualizados.";
+        let details = "Datos de lote o ficha técnica actualizados.";
         if (updateFields.quantity !== undefined && updateFields.quantity !== oldMed.quantity) {
           const diff = updateFields.quantity - oldMed.quantity;
           action = diff > 0 ? "INGRESO" : "SALIDA";
