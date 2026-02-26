@@ -38,7 +38,8 @@ import {
 import NotFound from "@/pages/not-found";
 import Dashboard from "@/pages/Dashboard";
 import Inventory from "@/pages/Inventory";
-import Families from "@/pages/Families";
+// ✅ ACTUALIZADO: Importamos la nueva página con buscador y filtros
+import FamiliesPage from "@/pages/FamiliesPage"; 
 import UsersPage from "@/pages/Users"; 
 import Login from "@/pages/Login";
 import SettingsPage from "@/pages/Settings"; 
@@ -101,12 +102,12 @@ function Router() {
               <SidebarMenuItem>
                 <SidebarMenuButton 
                   asChild 
-                  isActive={window.location.search.includes("filter=pediatric")} 
+                  isActive={location === "/inventory" && window.location.search.includes("filter=pediatric")} 
                   tooltip="Área Pediátrica"
                 >
                   <Link href="/inventory?filter=pediatric">
                     <Baby className="size-4 text-blue-400" />
-                    <span className="text-blue-50/90">Área Pediátrica</span>
+                    <span className="text-blue-600/90 font-semibold">Área Pediátrica</span>
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
@@ -157,7 +158,7 @@ function Router() {
         </SidebarContent>
 
         <SidebarFooter>
-          <div className="rounded-[1.4rem] bg-slate-900 p-4 flex flex-col gap-4 m-2">
+          <div className="rounded-[1.4rem] bg-slate-900 p-4 flex flex-col gap-4 m-2 border border-slate-800">
             <div className="flex flex-col gap-1">
               <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Usuario</p>
               <p className="text-sm font-bold text-white truncate">{user.username}</p>
@@ -166,7 +167,7 @@ function Router() {
             <SidebarMenuButton 
               onClick={() => logout()}
               variant="outline" 
-              className="border-red-500/50 text-red-400 hover:bg-red-500/10 hover:text-red-400 h-10"
+              className="border-red-500/50 text-red-400 hover:bg-red-500/10 hover:text-red-400 h-10 w-full justify-center"
             >
               <LogOut className="size-4" />
               <span>Cerrar Sesión</span>
@@ -190,8 +191,9 @@ function Router() {
               {user.role === 'admin' ? <LogsPage /> : <NotFound />}
             </Route>
             
+            {/* ✅ ACTUALIZADO: La ruta ahora apunta a FamiliesPage */}
             <Route path="/families">
-              {user.role === 'admin' ? <Families /> : <NotFound />}
+              {user.role === 'admin' ? <FamiliesPage /> : <NotFound />}
             </Route>
             
             <Route path="/users">
