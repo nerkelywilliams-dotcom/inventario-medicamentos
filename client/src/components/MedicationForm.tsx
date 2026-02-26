@@ -14,7 +14,6 @@ import { Switch } from "@/components/ui/switch";
 import { Loader2, X, Pill, Activity, AlertOctagon, RefreshCw, Baby, Sparkles, CheckCircle2, Image as ImageIcon } from "lucide-react";
 import { z } from "zod";
 import { useQuery } from "@tanstack/react-query";
-import { Progress } from "@/components/ui/progress"; // Asegúrate de tener este componente de shadcn
 
 interface MedicationFormProps {
   defaultValues?: Partial<InsertMedicationFull>;
@@ -34,7 +33,7 @@ export function MedicationForm({ defaultValues, onSubmit, isLoading, submitLabel
   const [isCustomVia, setIsCustomVia] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   
-  // ✅ NUEVOS ESTADOS PARA EL PROGRESO DE CARGA
+  // ✅ ESTADOS PARA EL PROGRESO DE CARGA
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
 
@@ -285,7 +284,6 @@ export function MedicationForm({ defaultValues, onSubmit, isLoading, submitLabel
               )}
             />
             
-            {/* ✅ CAMPO DE IMAGEN CON BARRA DE PROGRESO CORREGIDA */}
             <FormField
               control={form.control}
               name="imageUrl"
@@ -320,19 +318,27 @@ export function MedicationForm({ defaultValues, onSubmit, isLoading, submitLabel
                         }} 
                       />
                       
+                      {/* ✅ BARRA DE PROGRESO MANUAL CON TAILWIND */}
                       {isUploading && (
                         <div className="p-3 border rounded-lg bg-slate-50 animate-in fade-in duration-500">
                           <div className="flex justify-between items-center mb-2">
                             <span className="text-xs font-bold text-slate-600 flex items-center gap-2">
                               {uploadProgress < 100 ? (
-                                <><Loader2 className="h-3 w-3 animate-spin" /> Procesando imagen...</>
+                                <><Loader2 className="h-3 w-3 animate-spin text-blue-600" /> Procesando imagen...</>
                               ) : (
                                 <><CheckCircle2 className="h-3 w-3 text-green-500" /> Imagen lista</>
                               )}
                             </span>
                             <span className="text-xs font-black text-blue-600">{uploadProgress}%</span>
                           </div>
-                          <Progress value={uploadProgress} className="h-2" />
+                          
+                          {/* Contenedor de la barra */}
+                          <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
+                            <div 
+                              className="bg-blue-600 h-full rounded-full transition-all duration-300 ease-out shadow-[0_0_8px_rgba(37,99,235,0.4)]" 
+                              style={{ width: `${uploadProgress}%` }}
+                            ></div>
+                          </div>
                         </div>
                       )}
                     </div>
@@ -419,7 +425,7 @@ export function MedicationForm({ defaultValues, onSubmit, isLoading, submitLabel
         </div>
 
         <div className="flex justify-end pt-4">
-          <Button type="submit" disabled={isLoading || (isUploading && uploadProgress < 100)} className="w-full md:w-auto px-8">
+          <Button type="submit" disabled={isLoading || (isUploading && uploadProgress < 100)} className="w-full md:w-auto px-8 font-bold">
             {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {submitLabel}
           </Button>
