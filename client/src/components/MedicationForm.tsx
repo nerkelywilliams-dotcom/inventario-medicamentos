@@ -11,9 +11,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { Switch } from "@/components/ui/switch";
-import { Loader2, X, Pill, Activity, AlertOctagon, RefreshCw, Baby, Sparkles, CheckCircle2 } from "lucide-react";
+import { Loader2, X, Pill, Activity, AlertOctagon, RefreshCw, Baby, Sparkles, CheckCircle2, Image as ImageIcon } from "lucide-react";
 import { z } from "zod";
 import { useQuery } from "@tanstack/react-query";
+import { Progress } from "@/components/ui/progress"; // Asegúrate de tener este componente de shadcn
 
 interface MedicationFormProps {
   defaultValues?: Partial<InsertMedicationFull>;
@@ -32,6 +33,10 @@ export function MedicationForm({ defaultValues, onSubmit, isLoading, submitLabel
   const [isCustomPresentation, setIsCustomPresentation] = useState(false);
   const [isCustomVia, setIsCustomVia] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  
+  // ✅ NUEVOS ESTADOS PARA EL PROGRESO DE CARGA
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [isUploading, setIsUploading] = useState(false);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -55,7 +60,6 @@ export function MedicationForm({ defaultValues, onSubmit, isLoading, submitLabel
     } as any,
   });
 
-  // --- SOLUCIÓN A LOS 8 ERRORES DE TIPADO ---
   const { data: existingCatalog } = useQuery<Medication>({
     queryKey: [`/api/medication-catalog/search/${searchTerm}`],
     enabled: searchTerm.length > 2,
@@ -64,8 +68,6 @@ export function MedicationForm({ defaultValues, onSubmit, isLoading, submitLabel
 
   const handleAutofill = () => {
     if (!existingCatalog) return;
-    
-    // Usamos type assertion para asegurar a TS que estos campos existen
     const catalog = existingCatalog as any;
 
     if (catalog.familyId) form.setValue("familyId", catalog.familyId);
@@ -76,7 +78,6 @@ export function MedicationForm({ defaultValues, onSubmit, isLoading, submitLabel
     form.setValue("administrationRoute", catalog.administrationRoute || "");
     form.setValue("contraindications", catalog.contraindications || "");
     form.setValue("interactions", catalog.interactions || "");
-    
     setSearchTerm(""); 
   };
 
@@ -176,7 +177,9 @@ export function MedicationForm({ defaultValues, onSubmit, isLoading, submitLabel
                   </FormDescription>
                 </div>
                 <FormControl>
-                  <Switch checked={field.value} onCheckedChange={field.onChange} className="data-[state=checked]:bg-sky-500" />
+                  <span className="cursor-pointer">
+                    <Switch checked={field.value} onCheckedChange={field.onChange} className="data-[state=checked]:bg-sky-500" />
+                  </span>
                 </FormControl>
               </FormItem>
             )}
@@ -281,17 +284,58 @@ export function MedicationForm({ defaultValues, onSubmit, isLoading, submitLabel
                 </FormItem>
               )}
             />
+            
+            {/* ✅ CAMPO DE IMAGEN CON BARRA DE PROGRESO CORREGIDA */}
             <FormField
               control={form.control}
               name="imageUrl"
               render={({ field: { onChange } }) => (
                 <FormItem>
-                  <FormLabel>Foto del empaque</FormLabel>
+                  <FormLabel className="flex items-center gap-2 font-bold">
+                    <ImageIcon className="h-4 w-4 text-blue-500" /> Foto del empaque
+                  </FormLabel>
                   <FormControl>
-                    <Input type="file" accept="image/*" onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) onChange(file);
-                    }} />
+                    <div className="space-y-3">
+                      <Input 
+                        type="file" 
+                        accept="image/*" 
+                        className="cursor-pointer"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            onChange(file);
+                            // Iniciar simulación de progreso
+                            setIsUploading(true);
+                            setUploadProgress(0);
+                            const interval = setInterval(() => {
+                              setUploadProgress((prev) => {
+                                if (prev >= 100) {
+                                  clearInterval(interval);
+                                  return 100;
+                                }
+                                return prev + 10;
+                              });
+                            }, 100);
+                          }
+                        }} 
+                      />
+                      
+                      {isUploading && (
+                        <div className="p-3 border rounded-lg bg-slate-50 animate-in fade-in duration-500">
+                          <div className="flex justify-between items-center mb-2">
+                            <span className="text-xs font-bold text-slate-600 flex items-center gap-2">
+                              {uploadProgress < 100 ? (
+                                <><Loader2 className="h-3 w-3 animate-spin" /> Procesando imagen...</>
+                              ) : (
+                                <><CheckCircle2 className="h-3 w-3 text-green-500" /> Imagen lista</>
+                              )}
+                            </span>
+                            <span className="text-xs font-black text-blue-600">{uploadProgress}%</span>
+                          </div>
+                          <Progress value={uploadProgress} className="h-2" />
+                        </div>
+                      )}
+                    </div>
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -375,7 +419,7 @@ export function MedicationForm({ defaultValues, onSubmit, isLoading, submitLabel
         </div>
 
         <div className="flex justify-end pt-4">
-          <Button type="submit" disabled={isLoading} className="w-full md:w-auto px-8">
+          <Button type="submit" disabled={isLoading || (isUploading && uploadProgress < 100)} className="w-full md:w-auto px-8">
             {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {submitLabel}
           </Button>
