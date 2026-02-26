@@ -41,10 +41,12 @@ export default function FamiliesPage() {
   const [sortBy, setSortBy] = useState("newest");
   const [isOpen, setIsOpen] = useState(false);
 
-  // 3. Extracción segura de datos (Evita el error de pantalla en blanco)
+  // 3. Extracción segura de datos
   const families = familiesHook?.families || [];
   const isLoadingFamilies = familiesHook?.isLoading;
-  const createFamily = familiesHook?.createFamily; // Objeto de mutación
+  const createFamily = familiesHook?.createFamily; 
+  const updateFamily = familiesHook?.updateFamily; // ➕ Agregado: para editar
+  const deleteFamily = familiesHook?.deleteFamily; // ➕ Agregado: para eliminar
 
   const medications = medicationsHook?.medications || [];
   const isLoadingMeds = medicationsHook?.isLoading;
@@ -70,7 +72,7 @@ export default function FamiliesPage() {
     });
   }, [families, searchTerm, sortBy, medications]);
 
-  // 5. Manejador de creación con validación de duplicados
+  // 5. Manejador de creación
   const handleCreateFamily = async (data: any) => {
     const isDuplicate = families.some(
       (f) => f.name?.toLowerCase() === data.name?.trim().toLowerCase()
@@ -100,7 +102,29 @@ export default function FamiliesPage() {
     }
   };
 
-  // 6. Pantalla de carga (Previene errores de renderizado inicial)
+  // ➕ 5.1 Manejador de Eliminación (Lo que faltaba)
+  const handleDeleteFamily = async (id: number) => {
+    const hasMedications = medications.some(m => m.familyId === id);
+    if (hasMedications) {
+      toast({
+        title: "No se puede eliminar",
+        description: "Esta familia tiene medicamentos asociados.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (window.confirm("¿Estás seguro de eliminar este grupo terapéutico?")) {
+      try {
+        await deleteFamily?.mutateAsync(id);
+        toast({ title: "Eliminado", description: "Familia eliminada con éxito." });
+      } catch (e) {
+        toast({ title: "Error", description: "No se pudo eliminar.", variant: "destructive" });
+      }
+    }
+  };
+
+  // 6. Pantalla de carga
   if (isLoadingFamilies || isLoadingMeds) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[400px]">
@@ -162,7 +186,12 @@ export default function FamiliesPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredAndSortedFamilies.map((family) => (
-          <FamilyCard key={family.id} family={family} />
+          <FamilyCard 
+            key={family.id} 
+            family={family} 
+            onDelete={() => handleDeleteFamily(family.id)} // ➕ Pasamos la función de eliminar
+            onUpdate={(data) => updateFamily?.mutateAsync({ id: family.id, ...data })} // ➕ Pasamos la función de editar
+          />
         ))}
       </div>
 
