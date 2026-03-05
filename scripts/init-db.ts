@@ -366,8 +366,19 @@ async function initialize() {
     console.log("✅ Base de datos inicializada correctamente\n");
     
   } catch (error) {
-    console.error("❌ Error al inicializar BD:", error);
-    process.exit(1);
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    
+    // Si es error de autenticación/conexión, loguea pero continúa (el servidor puede servir estaticos)
+    if (errorMsg.includes("password authentication") || errorMsg.includes("ECONNREFUSED") || errorMsg.includes("connection")) {
+      console.warn("⚠️  Error de conexión a BD (DATABASE_URL probablemente mal configurada):");
+      console.warn("   ", errorMsg);
+      console.warn("\n⚠️  El servidor arrancará pero sin acceso a datos. Verifica DATABASE_URL en Render.\n");
+      // No hacer process.exit() para permitir que el servidor arranque
+    } else {
+      // Para errores no relacionados con conexión, sí salir
+      console.error("❌ Error crítico al inicializar BD:", error);
+      process.exit(1);
+    }
   } finally {
     await pool.end();
   }

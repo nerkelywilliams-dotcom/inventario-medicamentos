@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "NODE_ENV=development tsx server/index.ts",
     "build": "vite build && esbuild server/index.ts --platform=node --bundle --format=esm --outdir=dist --packages=external --banner:js=\"import {fileURLToPath} from 'url';import {dirname} from 'path';const __filename=fileURLToPath(import.meta.url);const __dirname=dirname(__filename);\" && esbuild scripts/init-db.ts --platform=node --bundle --format=esm --outdir=dist/scripts --packages=external",
-    "start": "npx drizzle-kit push --force && tsx scripts/init-db.ts --force && node dist/index.js",
+    "start": "(npx drizzle-kit push || true) && (NODE_ENV=production tsx scripts/init-db.ts || true) && node dist/index.js",
     "db:init": "tsx scripts/init-db.ts",
     "check": "tsc",
     "db:push": "drizzle-kit push"
