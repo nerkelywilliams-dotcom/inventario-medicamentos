@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "NODE_ENV=development tsx server/index.ts",
     "build": "vite build && esbuild server/index.ts --platform=node --bundle --format=esm --outdir=dist --packages=external --banner:js=\"import {fileURLToPath} from 'url';import {dirname} from 'path';const __filename=fileURLToPath(import.meta.url);const __dirname=dirname(__filename);\" && esbuild scripts/init-db.ts --platform=node --bundle --format=esm --outdir=dist/scripts --packages=external",
-    "start": "(npx drizzle-kit push || true) && (NODE_ENV=production tsx scripts/init-db.ts || true) && node dist/index.js",
+    "start": "npx drizzle-kit push && NODE_ENV=production node dist/scripts/init-db.js || true && node dist/index.js",
     "db:init": "tsx scripts/init-db.ts",
     "check": "tsc",
     "db:push": "drizzle-kit push"
@@ -80,7 +80,9 @@
     "ws": "^8.18.0",
     "xlsx": "^0.18.5",
     "zod": "^3.24.2",
-    "zod-validation-error": "^3.4.0"
+    "zod-validation-error": "^3.4.0",
+    "tsx": "^4.20.5",
+    "drizzle-kit": "^0.31.8"
   },
   "devDependencies": {
     "@replit/vite-plugin-cartographer": "^0.4.4",
@@ -99,10 +101,8 @@
     "@types/ws": "^8.5.13",
     "@vitejs/plugin-react": "^4.7.0",
     "autoprefixer": "^10.4.20",
-    "drizzle-kit": "^0.31.8",
     "postcss": "^8.4.47",
     "tailwindcss": "^3.4.17",
-    "tsx": "^4.20.5",
     "typescript": "5.6.3"
   },
   "overrides": {
