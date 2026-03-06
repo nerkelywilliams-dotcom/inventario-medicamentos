@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Switch, Route, Link, useLocation } from "wouter";
+import { Switch, Route, Link, useLocation, Redirect } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -60,7 +60,18 @@ function Router() {
     );
   }
 
-  if (!user) return <Login />;
+  // ✅ MEJORA DE SEGURIDAD: Si no hay usuario y no estamos en la página de login, 
+  // forzamos el renderizado del componente Login y bloqueamos el Sidebar.
+  if (!user) {
+    return (
+      <Switch>
+        <Route path="/auth" component={Login} />
+        <Route>
+          <Redirect to="/auth" />
+        </Route>
+      </Switch>
+    );
+  }
 
   return (
     <div className="flex min-h-screen w-full bg-slate-50">
@@ -191,7 +202,6 @@ function Router() {
               {user.role === 'admin' ? <LogsPage /> : <NotFound />}
             </Route>
             
-            {/* ✅ ACTUALIZADO: La ruta ahora apunta a FamiliesPage */}
             <Route path="/families">
               {user.role === 'admin' ? <FamiliesPage /> : <NotFound />}
             </Route>
