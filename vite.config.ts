@@ -21,21 +21,20 @@ export default defineConfig({
     reportCompressedSize: false, // Mejora la velocidad de build
     rollupOptions: {
       output: {
-        // Corregimos la división de archivos para evitar el error de 'Children'
-        manualChunks(id) {
+        // SOLUCIÓN: Desactivamos la división manual para evitar que React pierda su contexto (error de 'Children').
+        // Mantenemos la estructura comentada por si a futuro requieres optimizar peso específico.
+        manualChunks: undefined,
+        /* manualChunks(id) {
           if (id.includes("node_modules")) {
-            // Mantenemos React y React-DOM juntos sí o sí
             if (id.includes("react") || id.includes("react-dom") || id.includes("scheduler")) {
               return "react-core";
             }
-            // Librerías de iconos (suelen ser pesadas)
             if (id.includes("lucide-react")) {
               return "ui-icons";
             }
-            // El resto de dependencias en un solo paquete vendor
             return "vendor";
           }
-        },
+        }, */
       },
     },
     chunkSizeWarningLimit: 2000, // Aumentamos el límite para evitar avisos innecesarios
