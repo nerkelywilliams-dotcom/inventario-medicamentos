@@ -45,6 +45,9 @@ export default function Inventory() {
   const familiesHook = useFamilies();
   const families = (familiesHook as any)?.data || [];
   
+  // Diagnóstico: Verificar en consola si llegan las familias
+  console.log("Datos de familias recibidos:", families);
+
   const createMutation = useCreateMedication();
   const updateMutation = useUpdateMedication();
   const deleteMutation = useDeleteMedication();
@@ -199,9 +202,13 @@ export default function Inventory() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todas las Familias</SelectItem>
-              {families?.map((f: any) => (
-                <SelectItem key={f.id} value={f.id.toString()}>{f.name}</SelectItem>
-              ))}
+              {Array.isArray(families) && families.length > 0 ? (
+                families.map((f: any) => (
+                  <SelectItem key={f.id} value={f.id.toString()}>{f.name}</SelectItem>
+                ))
+              ) : (
+                <SelectItem value="none" disabled>No hay familias cargadas</SelectItem>
+              )}
             </SelectContent>
           </Select>
         </div>
