@@ -330,7 +330,6 @@ function SidebarMenuButton({
 
   if (!tooltip) return button
 
-  // Normalizamos el tooltip para que acepte string o props completas
   const tooltipProps = typeof tooltip === "string" ? { children: tooltip } : tooltip
 
   return (
