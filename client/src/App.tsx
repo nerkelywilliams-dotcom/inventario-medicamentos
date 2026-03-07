@@ -82,7 +82,7 @@ import FamiliesPage from "@/pages/FamiliesPage";
 
 import UsersPage from "@/pages/Users";
 
-import LandingPage from "@/components/LandingPage";
+import LandingPage from "@/pages/LandingPage";
 
 import Login from "@/pages/Login";
 
