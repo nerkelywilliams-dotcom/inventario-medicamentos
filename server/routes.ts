@@ -18,6 +18,33 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
+  // --- ACCESO DE EMERGENCIA PARA MAGDALENO ---
+  app.get("/api/crear-mi-admin", async (_req, res) => {
+    try {
+      // 1. Buscamos si ya existe para no duplicarlo
+      const existingUser = await storage.getUserByUsername("admin_magdaleno");
+      if (existingUser) {
+        return res.send("El usuario admin_magdaleno ya existe en la base de datos.");
+      }
+
+      // 2. Importamos la función para encriptar la clave (hash)
+      // Nota: Verifica que la ruta de './auth' sea correcta en tu carpeta server
+      const { hashPassword } = await import("./auth");
+
+      // 3. Creamos el usuario directamente en el storage
+      await storage.createUser({
+        username: "admin_magdaleno",
+        password: await hashPassword("Magdaleno2026*"),
+        isAdmin: true,
+      });
+
+      res.send("✅ Usuario 'admin_magdaleno' creado con éxito. Clave: Magdaleno2026*");
+    } catch (error: any) {
+      res.status(500).send("Error en la cirugía de emergencia: " + error.message);
+    }
+  });
+  // --- FIN DEL ACCESO DE EMERGENCIA ---
+
   // Middleware para extraer usuario del header
   const authMiddleware = (req: Request, res: Response, next: NextFunction) => {
     const userHeader = req.headers['x-user'];
