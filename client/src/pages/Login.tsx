@@ -2,25 +2,30 @@ import React, { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useAuth } from "../context/AuthContext"; 
 import { useLocation } from "wouter"; 
-import { User, Lock, Loader2, Eye, EyeOff } from "lucide-react"; 
-import { ForgotPasswordDialog } from "@/components/auth/ForgotPasswordDialog"; // <--- Importación clave
+import { User, Lock, Loader2, Eye, EyeOff, AlertCircle } from "lucide-react"; 
+import { ForgotPasswordDialog } from "@/components/auth/ForgotPasswordDialog"; 
 
 export default function Login() {
   const { user, login } = useAuth();
   const [, setLocation] = useLocation();
   const { register, handleSubmit, formState: { isSubmitting } } = useForm();
   const [showPassword, setShowPassword] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null); // Estado para mostrar errores
 
   useEffect(() => {
     if (user) setLocation("/");
   }, [user, setLocation]);
 
   const onSubmit = async (data: any) => {
+    setErrorMsg(null); // Limpiar error anterior
     try {
+      // Intentar login
       await login(data.username, data.password);
-      setLocation("/");
-    } catch (error) {
+      // Si tiene éxito, useAuth debería disparar el cambio de estado y useEffect redirigirá
+    } catch (error: any) {
       console.error("Fallo el ingreso:", error);
+      // Capturamos el error para mostrarlo al usuario
+      setErrorMsg(error?.message || "Usuario o contraseña incorrectos.");
     }
   };
 
@@ -49,6 +54,14 @@ export default function Login() {
                 <h2 className="text-3xl font-bold text-slate-800">Iniciar Sesión</h2>
                 <p className="text-slate-400 text-sm font-medium">Gestión Farmacéutica Profesional</p>
             </div>
+
+            {/* Aviso de error si algo falla */}
+            {errorMsg && (
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-600 rounded-lg flex items-center text-sm">
+                <AlertCircle className="w-4 h-4 mr-2" />
+                {errorMsg}
+              </div>
+            )}
 
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
                 <div>
@@ -82,7 +95,6 @@ export default function Login() {
                         </button>
                     </div>
                     
-                    {/* Botón de Olvidaste Contraseña añadido aquí */}
                     <div className="flex justify-end mt-2">
                       <ForgotPasswordDialog />
                     </div>
