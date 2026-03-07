@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import * as XLSX from "xlsx";
 import { useMedications, useCreateMedication, useUpdateMedication, useDeleteMedication } from "@/hooks/use-medications";
 import { useFamilies } from "@/hooks/use-families";
@@ -13,6 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { MedicationForm } from "@/components/MedicationForm";
 import { MedicationDetail } from "@/components/MedicationDetail";
+import { ImportarCSV } from "@/components/ImportarCSV";
 import { ExpiryBadge, StockBadge } from "@/components/StatusBadges";
 import { Search, Plus, FileDown, Eye, Pencil, Trash2, FilterX, Tag, Baby } from "lucide-react";
 import { format, isValid, parseISO } from "date-fns";
@@ -33,11 +34,16 @@ export default function Inventory() {
   const params = new URLSearchParams(searchString);
   const isUrlPediatricFilter = params.get("filter") === "pediatric";
   
-  const { data: medications, isLoading } = useMedications({ 
+  // Corrección: tipado como any para evitar error de propiedad inexistente
+  const medicationsHook = useMedications({ 
     search: search || undefined,
     familyId: familyFilter !== "all" ? familyFilter : undefined 
   });
-  const { data: families } = useFamilies();
+  const medications = (medicationsHook as any)?.data || [];
+  const isLoading = (medicationsHook as any)?.isLoading;
+
+  const familiesHook = useFamilies();
+  const families = (familiesHook as any)?.data || [];
   
   const createMutation = useCreateMedication();
   const updateMutation = useUpdateMedication();
@@ -45,7 +51,8 @@ export default function Inventory() {
   const createLog = useCreateLog();
   const { toast } = useToast();
 
-  const filteredMedications = medications?.filter(med => {
+  // Corrección: agregado tipado (med: any) en el filtro
+  const filteredMedications = medications?.filter((med: any) => {
     const normalize = (str: string) => 
       str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
@@ -59,9 +66,9 @@ export default function Inventory() {
     }
 
     const isSearchingPediatric = term.startsWith("ped") || 
-                                 term.includes("nino") || 
-                                 term.includes("infantil") ||
-                                 term.includes("bebe");
+                                term.includes("nino") || 
+                                term.includes("infantil") ||
+                                term.includes("bebe");
 
     if (isSearchingPediatric) {
       return med.isPediatric === true;
@@ -72,7 +79,7 @@ export default function Inventory() {
 
   const handleExport = () => {
     if (!medications) return;
-    const data = medications.map(m => {
+    const data = medications.map((m: any) => {
       const date = new Date(m.expirationDate);
       return {
         Nombre: m.catalog?.name || "Sin nombre",
@@ -93,7 +100,7 @@ export default function Inventory() {
   };
 
   const handleDelete = async (id: number) => {
-    const medicationToDelete = medications?.find(m => m.id === id);
+    const medicationToDelete = medications?.find((m: any) => m.id === id);
     if (window.confirm(`¿Estás seguro de eliminar ${medicationToDelete?.catalog?.name}? Esta acción no se puede deshacer.`)) {
       await deleteMutation.mutateAsync(id);
       
@@ -136,37 +143,41 @@ export default function Inventory() {
           <Button variant="outline" onClick={handleExport} className="gap-2 border-primary/20 hover:bg-primary/5">
             <FileDown className="h-4 w-4" /> Exportar Excel
           </Button>
-          {isAdmin && (
-            <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-              <DialogTrigger asChild>
-                <Button className="gap-2 shadow-lg shadow-primary/20 bg-primary hover:bg-primary/90">
-                  <Plus className="h-4 w-4" /> Nuevo Medicamento
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-4xl max-h-[95vh] overflow-y-auto">
-                <DialogHeader>
-                  <DialogTitle className="text-2xl font-bold text-primary">Registrar Nuevo Ingreso</DialogTitle>
-                </DialogHeader>
-                <MedicationForm 
-                  submitLabel="Registrar Medicamento"
-                  isLoading={createMutation.isPending}
-                  onSubmit={async (data) => {
-                    await createMutation.mutateAsync(data);
-                    
-                    if (user) {
-                      createLog.mutate({
-                        action: "CREAR",
-                        details: `Se registró nuevo medicamento: ${data.name} (${data.dose})`,
-                        userId: user.id
-                      });
-                    }
 
-                    setIsCreateOpen(false);
-                    toast({ title: "Éxito", description: "Medicamento registrado correctamente." });
-                  }}
-                />
-              </DialogContent>
-            </Dialog>
+          {isAdmin && (
+            <>
+              <ImportarCSV />
+              <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+                <DialogTrigger asChild>
+                  <Button className="gap-2 shadow-lg shadow-primary/20 bg-primary hover:bg-primary/90">
+                    <Plus className="h-4 w-4" /> Nuevo Medicamento
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-4xl max-h-[95vh] overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle className="text-2xl font-bold text-primary">Registrar Nuevo Ingreso</DialogTitle>
+                  </DialogHeader>
+                  <MedicationForm 
+                    submitLabel="Registrar Medicamento"
+                    isLoading={createMutation.isPending}
+                    onSubmit={async (data: any) => {
+                      await createMutation.mutateAsync(data);
+                      
+                      if (user) {
+                        createLog.mutate({
+                          action: "CREAR",
+                          details: `Se registró nuevo medicamento: ${data.name} (${data.dose})`,
+                          userId: user.id
+                        });
+                      }
+
+                      setIsCreateOpen(false);
+                      toast({ title: "Éxito", description: "Medicamento registrado correctamente." });
+                    }}
+                  />
+                </DialogContent>
+              </Dialog>
+            </>
           )}
         </div>
       </div>
@@ -188,7 +199,7 @@ export default function Inventory() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todas las Familias</SelectItem>
-              {families?.map(f => (
+              {families?.map((f: any) => (
                 <SelectItem key={f.id} value={f.id.toString()}>{f.name}</SelectItem>
               ))}
             </SelectContent>
@@ -230,7 +241,7 @@ export default function Inventory() {
                 </TableCell>
               </TableRow>
             ) : (
-              filteredMedications?.map((med) => (
+              filteredMedications?.map((med: any) => (
                 <TableRow 
                   key={med.id} 
                   className={`group transition-colors hover:bg-primary/5 ${med.isPediatric ? "bg-sky-50/40" : ""}`}
@@ -308,7 +319,7 @@ export default function Inventory() {
                                 }}
                                 submitLabel="Guardar Cambios"
                                 isLoading={updateMutation.isPending}
-                                onSubmit={async (data) => {
+                                onSubmit={async (data: any) => {
                                   await updateMutation.mutateAsync({ id: med.id, ...data });
                                   if (user) {
                                     createLog.mutate({

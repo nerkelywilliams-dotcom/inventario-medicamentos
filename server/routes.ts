@@ -283,6 +283,61 @@ export async function registerRoutes(
     }
   });
 
+  // ✅ NUEVA RUTA: Importación masiva desde CSV/Excel
+  app.post('/api/medications/import', async (req, res) => {
+    if (!req.user) return res.status(401).json({ message: 'No autorizado' });
+    if (req.user.role !== 'admin') return res.status(403).json({ message: 'Permiso denegado' });
+
+    try {
+      const medicationsToImport = req.body;
+      if (!Array.isArray(medicationsToImport)) {
+        return res.status(400).json({ message: 'Formato de datos inválido' });
+      }
+
+      let importedCount = 0;
+
+      for (const item of medicationsToImport) {
+        const name = (item.nombre || item.name || "").trim();
+        if (!name) continue;
+
+        // 1. Gestionar Catálogo
+        let catalog = await storage.getMedicationCatalogByName(name);
+        if (!catalog) {
+          catalog = await storage.createMedicationCatalog({
+            name: name,
+            description: "Carga masiva",
+            contraindications: "No especificadas",
+            interactions: "No especificadas"
+          });
+        }
+
+        // 2. Crear Registro de Inventario
+        await storage.createMedication({
+          dose: item.dosis || "N/A",
+          presentation: item.presentacion || "N/A",
+          quantity: Number(item.cantidad) || 0,
+          expirationDate: item.fecha_vencimiento ? new Date(item.fecha_vencimiento) : new Date(),
+          isPediatric: item.es_pediatrico === 'true' || item.es_pediatrico === true,
+          familyId: item.familyId ? Number(item.familyId) : null,
+          inventoryLocation: req.user.inventoryLocation
+        }, catalog.id);
+
+        importedCount++;
+      }
+
+      await storage.createLog({
+        userId: (req.user as any).id,
+        action: "IMPORTACIÓN",
+        medicationName: "Varios",
+        details: `Carga masiva de ${importedCount} medicamentos finalizada.`
+      });
+
+      res.status(201).json({ message: "Importación completada", count: importedCount });
+    } catch (err) {
+      res.status(500).json({ message: "Error interno durante la importación" });
+    }
+  });
+
   // ✅ CORRECCIÓN PRINCIPAL: Actualizar tanto el lote como la ficha técnica (imagen)
   app.put(api.medications.update.path, async (req, res) => {
     if (!req.user) return res.status(401).json({ message: 'No autorizado' });

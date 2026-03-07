@@ -4,7 +4,9 @@ import { Pill, Edit, Trash2 } from "lucide-react";
 import { Family } from "@shared/schema";
 
 interface FamilyCardProps {
-  family: Family;
+  family: any;
+  onDelete?: () => void;
+  onUpdate?: (data: any) => void;
 }
 
 export function FamilyCard({ family }: FamilyCardProps) {

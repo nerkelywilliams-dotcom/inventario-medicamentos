@@ -41,31 +41,32 @@ export default function FamiliesPage() {
   const [sortBy, setSortBy] = useState("newest");
   const [isOpen, setIsOpen] = useState(false);
 
-  // 3. Extracción segura de datos
-  const families = familiesHook?.families || [];
+  // 3. Extracción segura de datos (Ajustado según tus errores de TS en la captura)
+  // Usamos (hook as any).data porque el IDE detecta que es un UseQueryResult
+  const families = (familiesHook as any)?.data || (familiesHook as any)?.families || [];
   const isLoadingFamilies = familiesHook?.isLoading;
   const createFamily = familiesHook?.createFamily; 
-  const updateFamily = familiesHook?.updateFamily; // ➕ Agregado: para editar
-  const deleteFamily = familiesHook?.deleteFamily; // ➕ Agregado: para eliminar
+  const updateFamily = familiesHook?.updateFamily; 
+  const deleteFamily = familiesHook?.deleteFamily; 
 
-  const medications = medicationsHook?.medications || [];
+  const medications = (medicationsHook as any)?.data || (medicationsHook as any)?.medications || [];
   const isLoadingMeds = medicationsHook?.isLoading;
 
   // 4. Lógica de Filtrado y Ordenamiento
   const filteredAndSortedFamilies = useMemo(() => {
-    let result = families.filter(f => {
+    let result = families.filter((f: any) => {
       const name = f?.name?.toLowerCase() || "";
       const desc = f?.description?.toLowerCase() || "";
       const search = searchTerm.toLowerCase();
       return name.includes(search) || desc.includes(search);
     });
 
-    return [...result].sort((a, b) => {
+    return [...result].sort((a: any, b: any) => {
       if (sortBy === "az") return (a.name || "").localeCompare(b.name || "");
       if (sortBy === "za") return (b.name || "").localeCompare(a.name || "");
       if (sortBy === "most_used") {
-        const countA = medications.filter(m => m.familyId === a.id).length;
-        const countB = medications.filter(m => m.familyId === b.id).length;
+        const countA = medications.filter((m: any) => m.familyId === a.id).length;
+        const countB = medications.filter((m: any) => m.familyId === b.id).length;
         return countB - countA;
       }
       return (Number(b.id) || 0) - (Number(a.id) || 0);
@@ -75,7 +76,7 @@ export default function FamiliesPage() {
   // 5. Manejador de creación
   const handleCreateFamily = async (data: any) => {
     const isDuplicate = families.some(
-      (f) => f.name?.toLowerCase() === data.name?.trim().toLowerCase()
+      (f: any) => f.name?.toLowerCase() === data.name?.trim().toLowerCase()
     );
 
     if (isDuplicate) {
@@ -102,9 +103,21 @@ export default function FamiliesPage() {
     }
   };
 
-  // ➕ 5.1 Manejador de Eliminación (Lo que faltaba)
+  // 5.1 Manejador de Edición
+  const handleUpdateFamily = async (id: number, data: any) => {
+    try {
+      if (updateFamily?.mutateAsync) {
+        await updateFamily.mutateAsync({ id, ...data });
+        toast({ title: "Actualizado", description: "Cambios guardados." });
+      }
+    } catch (e) {
+      toast({ title: "Error", description: "No se pudo actualizar.", variant: "destructive" });
+    }
+  };
+
+  // 5.2 Manejador de Eliminación
   const handleDeleteFamily = async (id: number) => {
-    const hasMedications = medications.some(m => m.familyId === id);
+    const hasMedications = medications.some((m: any) => m.familyId === id);
     if (hasMedications) {
       toast({
         title: "No se puede eliminar",
@@ -116,8 +129,10 @@ export default function FamiliesPage() {
 
     if (window.confirm("¿Estás seguro de eliminar este grupo terapéutico?")) {
       try {
-        await deleteFamily?.mutateAsync(id);
-        toast({ title: "Eliminado", description: "Familia eliminada con éxito." });
+        if (deleteFamily?.mutateAsync) {
+          await deleteFamily.mutateAsync(id);
+          toast({ title: "Eliminado", description: "Familia eliminada con éxito." });
+        }
       } catch (e) {
         toast({ title: "Error", description: "No se pudo eliminar.", variant: "destructive" });
       }
@@ -185,12 +200,12 @@ export default function FamiliesPage() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredAndSortedFamilies.map((family) => (
+        {filteredAndSortedFamilies.map((family: any) => (
           <FamilyCard 
             key={family.id} 
             family={family} 
-            onDelete={() => handleDeleteFamily(family.id)} // ➕ Pasamos la función de eliminar
-            onUpdate={(data) => updateFamily?.mutateAsync({ id: family.id, ...data })} // ➕ Pasamos la función de editar
+            onDelete={() => handleDeleteFamily(family.id)} 
+            onUpdate={(data: any) => handleUpdateFamily(family.id, data)}
           />
         ))}
       </div>
