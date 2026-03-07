@@ -18,32 +18,27 @@ export default defineConfig({
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
+    reportCompressedSize: false, // Mejora la velocidad de build
     rollupOptions: {
       output: {
+        // Corregimos la división de archivos para evitar el error de 'Children'
         manualChunks(id) {
           if (id.includes("node_modules")) {
-            if (id.includes("react")) {
-              return "react-vendor";
+            // Mantenemos React y React-DOM juntos sí o sí
+            if (id.includes("react") || id.includes("react-dom") || id.includes("scheduler")) {
+              return "react-core";
             }
-            if (
-              id.includes("react-router-dom") ||
-              id.includes("wouter")
-            ) {
-              return "router-vendor";
-            }
+            // Librerías de iconos (suelen ser pesadas)
             if (id.includes("lucide-react")) {
-              return "ui-vendor";
+              return "ui-icons";
             }
-            if (id.includes("@tanstack/react-query")) {
-              return "query-vendor";
-            }
+            // El resto de dependencias en un solo paquete vendor
             return "vendor";
           }
         },
       },
     },
-    // Ajusta los límites de tamaño de chunks
-    chunkSizeWarningLimit: 1000, // en KB, aumenta si es necesario
+    chunkSizeWarningLimit: 2000, // Aumentamos el límite para evitar avisos innecesarios
   },
   server: {
     fs: {
