@@ -90,6 +90,10 @@ import SettingsPage from "@/pages/Settings";
 
 import LogsPage from "@/pages/logs-page";
 
+import Terms from "@/pages/Terms";
+
+import Privacy from "@/pages/Privacy";
+
 
 
 function Router() {
@@ -122,7 +126,7 @@ function Router() {
 
 
 
-  // ✅ LÓGICA DE RUTA PÚBLICA: si no hay usuario, mostramos Landing o Login
+  // ✅ LÓGICA DE RUTA PÚBLICA: si no hay usuario, mostramos Landing, Login, Terms y Privacy
 
   if (!user) {
 
@@ -133,6 +137,10 @@ function Router() {
         <Route path="/" component={LandingPage} />
 
         <Route path="/auth" component={Login} />
+
+        <Route path="/terms" component={Terms} />
+
+        <Route path="/privacy" component={Privacy} />
 
         <Route>
 
@@ -147,6 +155,8 @@ function Router() {
   }
 
 
+
+  // ✅ RUTAS PROTEGIDAS: si hay usuario, mostramos el Sidebar y rutas privadas
 
   return (
 

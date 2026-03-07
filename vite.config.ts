@@ -18,6 +18,32 @@ export default defineConfig({
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes("node_modules")) {
+            if (id.includes("react")) {
+              return "react-vendor";
+            }
+            if (
+              id.includes("react-router-dom") ||
+              id.includes("wouter")
+            ) {
+              return "router-vendor";
+            }
+            if (id.includes("lucide-react")) {
+              return "ui-vendor";
+            }
+            if (id.includes("@tanstack/react-query")) {
+              return "query-vendor";
+            }
+            return "vendor";
+          }
+        },
+      },
+    },
+    // Ajusta los límites de tamaño de chunks
+    chunkSizeWarningLimit: 1000, // en KB, aumenta si es necesario
   },
   server: {
     fs: {
