@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef } from "react";
+import { useState } from "react";
 import * as XLSX from "xlsx";
 import { useMedications, useCreateMedication, useUpdateMedication, useDeleteMedication } from "@/hooks/use-medications";
 import { useFamilies } from "@/hooks/use-families";
@@ -16,7 +16,7 @@ import { MedicationDetail } from "@/components/MedicationDetail";
 import { ImportarCSV } from "@/components/ImportarCSV";
 import { ExpiryBadge, StockBadge } from "@/components/StatusBadges";
 import { Search, Plus, FileDown, Eye, Pencil, Trash2, FilterX, Tag, Baby } from "lucide-react";
-import { format, isValid, parseISO } from "date-fns";
+import { format, isValid } from "date-fns";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
@@ -34,7 +34,7 @@ export default function Inventory() {
   const params = new URLSearchParams(searchString);
   const isUrlPediatricFilter = params.get("filter") === "pediatric";
   
-  // Corrección: tipado como any para evitar error de propiedad inexistente
+  // Obtención de medicamentos
   const medicationsHook = useMedications({ 
     search: search || undefined,
     familyId: familyFilter !== "all" ? familyFilter : undefined 
@@ -42,11 +42,12 @@ export default function Inventory() {
   const medications = (medicationsHook as any)?.data || [];
   const isLoading = (medicationsHook as any)?.isLoading;
 
+  // Obtención de familias (Asegúrate de que este hook esté funcionando)
   const familiesHook = useFamilies();
   const families = (familiesHook as any)?.data || [];
   
-  // Diagnóstico: Verificar en consola si llegan las familias
-  console.log("Datos de familias recibidos:", families);
+  // Diagnóstico en consola
+  console.log("Datos de familias en Inventory:", families);
 
   const createMutation = useCreateMedication();
   const updateMutation = useUpdateMedication();
@@ -54,14 +55,13 @@ export default function Inventory() {
   const createLog = useCreateLog();
   const { toast } = useToast();
 
-  // Corrección: agregado tipado (med: any) en el filtro
   const filteredMedications = medications?.filter((med: any) => {
     const normalize = (str: string) => 
       str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
     const term = normalize(search);
     const name = normalize(med.catalog?.name || "");
-    const presentation = normalize(med.presentation);
+    const presentation = normalize(med.presentation || "");
 
     if (isUrlPediatricFilter) {
       const matchesSearch = name.includes(term) || presentation.includes(term);
@@ -126,7 +126,7 @@ export default function Inventory() {
           <h2 className="text-3xl font-display font-bold text-foreground">
             {isUrlPediatricFilter ? (
               <span className="flex items-center gap-2 text-blue-600">
-                <Baby className="h-8 w-8" /> Área Pediátrica
+                < Baby className="h-8 w-8" /> Área Pediátrica
               </span>
             ) : (
               "Gestión de Farmacia"
@@ -163,6 +163,7 @@ export default function Inventory() {
                   <MedicationForm 
                     submitLabel="Registrar Medicamento"
                     isLoading={createMutation.isPending}
+                    families={families} // AGREGADO: Pasamos las familias al formulario
                     onSubmit={async (data: any) => {
                       await createMutation.mutateAsync(data);
                       
@@ -307,6 +308,7 @@ export default function Inventory() {
                                 <DialogTitle className="text-2xl font-bold text-amber-600">Editar Registro Médico</DialogTitle>
                               </DialogHeader>
                               <MedicationForm 
+                                families={families} // AGREGADO: También para edición
                                 defaultValues={{
                                   name: med.catalog?.name ?? "",
                                   dose: med.dose,
