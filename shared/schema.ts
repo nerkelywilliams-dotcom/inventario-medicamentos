@@ -112,27 +112,32 @@ export const insertMedicationSchema = createInsertSchema(medications).omit({
 export const insertMedicationFullSchema = z.object({
   // Campos del catálogo
   name: z.string().min(1, "El nombre del medicamento es requerido"),
-  description: z.string().optional(),
+  description: z.string().optional().nullable(),
   
-  // CAMBIO CLAVE: imageUrl ahora acepta cualquier tipo (File o String) para evitar el error de validación
-  imageUrl: z.any().optional(), 
+  // imageUrl acepta File para el cliente o string para la base de datos
+  imageUrl: z.any().optional().nullable(), 
   
-  mechanismOfAction: z.string().optional(),
-  indications: z.string().optional(),
-  posology: z.string().optional(),
-  administrationRoute: z.string().optional(),
-  contraindications: z.string().optional(),
-  interactions: z.string().optional(),
+  mechanismOfAction: z.string().optional().nullable(),
+  indications: z.string().optional().nullable(),
+  posology: z.string().optional().nullable(),
+  administrationRoute: z.string().optional().nullable(),
+  
+  // Ajuste para coincidir con los defaults de la DB si vienen vacíos
+  contraindications: z.string().optional().nullable().transform(val => val ?? "No especificadas"),
+  interactions: z.string().optional().nullable().transform(val => val ?? "No especificadas"),
   
   // Campos de inventario
-  dose: z.string().optional().default("Ver empaque"),
+  dose: z.string().min(1, "La dosis es requerida").default("Ver empaque"),
   presentation: z.string().min(1, "La presentación es requerida"),
   
-  // Coerción para números (lo que ya tenías corregido)
+  // Coerción mejorada
   quantity: z.coerce.number().int().min(0, "El stock no puede ser negativo").default(0),
-  expirationDate: z.coerce.date(), 
-  isPediatric: z.boolean().optional().default(false),
-  familyId: z.coerce.number().int().optional(),
+  expirationDate: z.coerce.date({
+    required_error: "La fecha de vencimiento es requerida",
+    invalid_type_error: "Formato de fecha inválido",
+  }), 
+  isPediatric: z.boolean().default(false),
+  familyId: z.coerce.number().int().optional().nullable(),
 });
 
 // Familias
