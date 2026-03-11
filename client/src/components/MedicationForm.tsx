@@ -54,12 +54,28 @@ export function MedicationForm({ defaultValues, onSubmit, isLoading, submitLabel
       interactions: "",
       isPediatric: false,
       ...defaultValues,
-      // Aseguramos que la fecha sea un string compatible con input type="date" (YYYY-MM-DD)
       expirationDate: defaultValues?.expirationDate 
         ? new Date(defaultValues.expirationDate).toISOString().split('T')[0]
         : "",
     } as any,
   });
+
+  // ✅ CORRECCIÓN CLAVE: Sincronizar el formulario cuando cambian los valores por defecto (al editar)
+  // Esto asegura que el "Mecanismo de Acción" y otros campos aparezcan al abrir el modal
+  useEffect(() => {
+    if (defaultValues) {
+      const formattedValues = {
+        ...defaultValues,
+        expirationDate: defaultValues.expirationDate 
+          ? new Date(defaultValues.expirationDate).toISOString().split('T')[0]
+          : "",
+      };
+      form.reset(formattedValues as any);
+      if (defaultValues.imageUrl) {
+        setPreviewUrl(defaultValues.imageUrl);
+      }
+    }
+  }, [defaultValues, form]);
 
   const { data: existingCatalog } = useQuery<Medication>({
     queryKey: [`/api/medication-catalog/search/${searchTerm}`],
@@ -81,7 +97,6 @@ export function MedicationForm({ defaultValues, onSubmit, isLoading, submitLabel
     setSearchTerm(""); 
   };
 
-  // Función auxiliar para convertir File a Base64
   const fileToBase64 = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -93,18 +108,17 @@ export function MedicationForm({ defaultValues, onSubmit, isLoading, submitLabel
 
   const handleSubmit = async (data: any) => {
     try {
+      // ✅ Aseguramos que los campos vacíos se envíen como strings vacíos o null según el esquema
       const formattedData = {
         ...data,
-        // Convertimos el string del input date a un objeto Date real para el backend
         expirationDate: data.expirationDate ? new Date(data.expirationDate) : null,
+        mechanismOfAction: data.mechanismOfAction || "",
       };
 
-      // Si imageUrl es un File (usuario subió uno nuevo), lo convertimos
       if (data.imageUrl instanceof File) {
         const base64 = await fileToBase64(data.imageUrl);
         await onSubmit({ ...formattedData, imageUrl: base64 });
       } else {
-        // Si no cambió o es null, enviamos como está
         await onSubmit(formattedData);
       }
     } catch (error) {
@@ -282,7 +296,6 @@ export function MedicationForm({ defaultValues, onSubmit, isLoading, submitLabel
               )}
             />
             
-            {/* ✅ FOTO CON VISTA PREVIA Y BARRA DE PROGRESO */}
             <FormField
               control={form.control}
               name="imageUrl"
@@ -291,7 +304,6 @@ export function MedicationForm({ defaultValues, onSubmit, isLoading, submitLabel
                   <FormLabel className="flex items-center gap-2 font-bold"><ImageIcon className="h-4 w-4 text-blue-500" /> Foto del empaque</FormLabel>
                   <FormControl>
                     <div className="space-y-3">
-                      {/* MINIATURA DE VISTA PREVIA */}
                       {previewUrl && (
                         <div className="relative w-40 h-28 rounded-lg border-2 border-dashed border-slate-300 overflow-hidden bg-slate-50 group">
                           <img src={previewUrl} alt="Preview" className="w-full h-full object-cover transition-transform group-hover:scale-105" />
@@ -319,13 +331,10 @@ export function MedicationForm({ defaultValues, onSubmit, isLoading, submitLabel
                             const file = e.target.files?.[0];
                             if (file) {
                               onChange(file);
-                              
-                              // Generar Preview local para la UI
                               const reader = new FileReader();
                               reader.onloadend = () => setPreviewUrl(reader.result as string);
                               reader.readAsDataURL(file);
 
-                              // Simulación de barra de progreso
                               setIsUploading(true);
                               setUploadProgress(0);
                               const interval = setInterval(() => {
