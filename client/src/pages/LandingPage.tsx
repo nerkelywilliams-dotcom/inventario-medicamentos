@@ -177,7 +177,7 @@ export default function LandingPage() {
             <h2 className="text-3xl font-bold">Datos de Contacto SSIA</h2>
             <div className="space-y-4 text-slate-400">
               <p>📍 Maracay, Venezuela</p>
-              <p>☎️ +1 (555) 123‑4567</p>
+              <p>☎️ +58 414-0393658</p>
               <p>✉️ contacto@ssia.example.com</p>
               <p>🕒 Lun‑Vie 9:00‑18:00</p>
             </div>
@@ -188,7 +188,7 @@ export default function LandingPage() {
               <span>Horario de atención</span>
             </div>
             <p className="text-slate-400 italic">
-              "Eficiencia para una atención médica ininterrumpida."
+             "Abocados a mostrar el amor de Dios al prójimo a través de la acción social."
             </p>
           </div>
         </div>
