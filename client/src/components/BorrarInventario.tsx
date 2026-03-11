@@ -13,7 +13,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
+} from "@/components/ui/alert-dialog"; // Asegúrate de que no tenga errores de dedo
 
 export function BorrarInventario() {
   const { toast } = useToast();
