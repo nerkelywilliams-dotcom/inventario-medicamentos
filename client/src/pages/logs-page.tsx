@@ -1,63 +1,63 @@
 import { useState } from "react";
 import { useLogs } from "@/hooks/use-logs";
 import { Link } from "wouter";
-import { ArrowLeft, Search, ArrowDownLeft, ArrowUpRight, FileEdit, Download } from "lucide-react"; // ✅ Añadido Download
+import { ArrowLeft, Search, ArrowDownLeft, ArrowUpRight, FileEdit, Download } from "lucide-react";
 import { format, isValid } from "date-fns";
 import { es } from "date-fns/locale";
-import jsPDF from "jspdf"; // ✅ Añadido para PDF
-import autoTable from "jspdf-autotable"; // ✅ Añadido para tablas en PDF
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
 export default function LogsPage() {
-  const { data: logs, isLoading } = useLogs();
+  // Ajuste: si tu hook devuelve { data: ... } extraemos data, si devuelve el array directo, usamos logs
+  const logsHook = useLogs();
+  const logs = (logsHook as any)?.data || (Array.isArray(logsHook) ? logsHook : []);
+  const isLoading = (logsHook as any)?.isLoading ?? false;
   const [search, setSearch] = useState("");
 
-  // ✅ CORRECCIÓN: Filtro con protección de nulidad
-  const filteredLogs = logs?.filter(log => 
-    log.medicationName.toLowerCase().includes(search.toLowerCase()) ||
-    (log.user?.username || "").toLowerCase().includes(search.toLowerCase()) ||
-    (log.details || "").toLowerCase().includes(search.toLowerCase())
-  );
+  // ✅ CORRECCIÓN: Filtro robusto con protección de nulidad
+  const filteredLogs = logs?.filter((log: any) => {
+    const medName = (log.medicationName || "").toLowerCase();
+    const username = (log.user?.username || "").toLowerCase();
+    const details = (log.details || "").toLowerCase();
+    const searchTerm = search.toLowerCase();
+    
+    return medName.includes(searchTerm) || 
+           username.includes(searchTerm) || 
+           details.includes(searchTerm);
+  });
 
-  // ✅ FUNCIÓN MEJORADA: Generar el reporte PDF con Diseño Profesional
+  // ✅ FUNCIÓN DE EXPORTACIÓN PDF
   const exportToPDF = () => {
     const doc = new jsPDF();
     const tableColumn = ["Acción", "Medicamento", "Detalle", "Responsable", "Fecha"];
     const tableRows: any[] = [];
 
-    filteredLogs?.forEach(log => {
+    filteredLogs?.forEach((log: any) => {
       const logData = [
         log.action,
-        log.medicationName,
+        log.medicationName || "N/A",
         log.details || "Sin descripción",
         log.user?.username || "Sistema",
-        format(new Date(log.timestamp), 'dd/MM/yyyy HH:mm', { locale: es })
+        isValid(new Date(log.timestamp)) ? format(new Date(log.timestamp), 'dd/MM/yyyy HH:mm', { locale: es }) : "Fecha inválida"
       ];
       tableRows.push(logData);
     });
 
-    // --- DISEÑO DE ENCABEZADO INSTITUCIONAL ---
-    // Rectángulo decorativo superior (Azul Corporativo #2b4cc4)
+    // --- DISEÑO DE ENCABEZADO ---
     doc.setFillColor(43, 76, 196);
     doc.rect(0, 0, 210, 40, 'F');
-
-    // Título Principal
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(22);
     doc.setFont("helvetica", "bold");
     doc.text("Sede Magdaleno", 14, 20);
-    
-    // Subtítulo
     doc.setFontSize(12);
     doc.setFont("helvetica", "normal");
     doc.text("Sistema de Gestión de Inventario Farmacéutico", 14, 28);
-
-    // Información del Reporte (Derecha)
     doc.setFontSize(10);
     doc.text(`Fecha: ${format(new Date(), 'dd/MM/yyyy')}`, 160, 20);
     doc.text(`Hora: ${format(new Date(), 'HH:mm')}`, 160, 26);
 
-    // --- CUERPO ---
-    doc.setTextColor(26, 43, 75); // Color oscuro #1a2b4b
+    doc.setTextColor(26, 43, 75);
     doc.setFontSize(14);
     doc.setFont("helvetica", "bold");
     doc.text("REPORTE DETALLADO DE MOVIMIENTOS", 14, 50);
@@ -67,44 +67,25 @@ export default function LogsPage() {
       body: tableRows,
       startY: 55,
       theme: 'striped',
-      headStyles: { 
-        fillColor: [43, 76, 196], 
-        textColor: [255, 255, 255],
-        fontStyle: 'bold',
-        halign: 'center'
-      },
-      bodyStyles: { 
-        textColor: [51, 51, 51],
-        fontSize: 9 
-      },
-      alternateRowStyles: { 
-        fillColor: [245, 247, 255] 
-      },
+      headStyles: { fillColor: [43, 76, 196], textColor: [255, 255, 255], fontStyle: 'bold', halign: 'center' },
+      bodyStyles: { textColor: [51, 51, 51], fontSize: 9 },
+      alternateRowStyles: { fillColor: [245, 247, 255] },
       margin: { top: 55 }
     });
 
-    // --- PIE DE PÁGINA ---
     const pageCount = (doc as any).internal.getNumberOfPages();
     for (let i = 1; i <= pageCount; i++) {
       doc.setPage(i);
       doc.setFontSize(8);
       doc.setTextColor(150);
-      doc.text(
-        `Página ${i} de ${pageCount} - Documento generado automáticamente por el Sistema de Inventario`,
-        105, 
-        285, 
-        { align: "center" }
-      );
+      doc.text(`Página ${i} de ${pageCount} - Documento generado automáticamente`, 105, 285, { align: "center" });
     }
-
     doc.save(`bitacora_magdaleno_${format(new Date(), 'yyyyMMdd_HHmm')}.pdf`);
   };
 
   return (
     <div className="min-h-screen bg-gray-50 p-4 md:p-8">
       <div className="max-w-7xl mx-auto space-y-8">
-        
-        {/* ENCABEZADO */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="space-y-1">
             <Link href="/">
@@ -117,11 +98,10 @@ export default function LogsPage() {
           </div>
 
           <div className="flex flex-col sm:flex-row items-center gap-3">
-            {/* ✅ BOTÓN DE EXPORTACIÓN CON MEJORAS */}
             <button 
               onClick={exportToPDF}
               disabled={!filteredLogs || filteredLogs.length === 0}
-              className="flex items-center gap-2 bg-white text-[#1a2b4b] px-5 py-3 rounded-xl border border-slate-200 font-bold shadow-sm hover:bg-slate-50 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto justify-center"
+              className="flex items-center gap-2 bg-white text-[#1a2b4b] px-5 py-3 rounded-xl border border-slate-200 font-bold shadow-sm hover:bg-slate-50 transition-all active:scale-95 disabled:opacity-50 w-full sm:w-auto justify-center"
             >
               <Download className="w-4 h-4 text-[#2b4cc4]" /> Exportar PDF
             </button>
@@ -141,7 +121,6 @@ export default function LogsPage() {
           </div>
         </div>
 
-        {/* TABLA CON SEGURIDAD PARA NULLS */}
         <div className="bg-white rounded-[2rem] border border-slate-100 shadow-xl shadow-slate-200/40 overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full">
@@ -160,28 +139,20 @@ export default function LogsPage() {
                 ) : filteredLogs?.length === 0 ? (
                   <tr><td colSpan={5} className="p-10 text-center text-slate-400 italic">No se encontraron registros.</td></tr>
                 ) : (
-                  filteredLogs?.map((log) => {
+                  filteredLogs?.map((log: any) => {
                     const dateObj = new Date(log.timestamp);
                     const isDateValid = isValid(dateObj);
-
                     return (
                       <tr key={log.id} className="group hover:bg-blue-50/30 transition-colors">
                         <td className="py-4 pl-8">
-                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-sm
-                            ${log.action === 'INGRESO' ? 'bg-emerald-100 text-emerald-600' : 
-                              log.action === 'SALIDA' ? 'bg-rose-100 text-rose-600' : 
-                              'bg-amber-100 text-amber-600'}`}>
+                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-sm ${log.action === 'INGRESO' ? 'bg-emerald-100 text-emerald-600' : log.action === 'SALIDA' ? 'bg-rose-100 text-rose-600' : 'bg-amber-100 text-amber-600'}`}>
                             {log.action === 'INGRESO' && <ArrowDownLeft size={20} />}
                             {log.action === 'SALIDA' && <ArrowUpRight size={20} />}
                             {(log.action !== 'INGRESO' && log.action !== 'SALIDA') && <FileEdit size={20} />}
                           </div>
                         </td>
-                        <td className="py-4 font-bold text-[#1a2b4b]">
-                          {log.medicationName}
-                        </td>
-                        <td className="py-4 text-slate-600 text-sm font-medium">
-                          {log.details || "Sin descripción"}
-                        </td>
+                        <td className="py-4 font-bold text-[#1a2b4b]">{log.medicationName || "---"}</td>
+                        <td className="py-4 text-slate-600 text-sm font-medium">{log.details || "Sin descripción"}</td>
                         <td className="py-4">
                           <span className="inline-flex items-center px-3 py-1 rounded-lg bg-slate-100 text-slate-600 text-xs font-bold border border-slate-200">
                             {log.user?.username || 'Sistema'}
@@ -189,12 +160,8 @@ export default function LogsPage() {
                         </td>
                         <td className="py-4 pr-8 text-right">
                           <div className="flex flex-col items-end">
-                            <span className="font-bold text-slate-700">
-                              {isDateValid ? format(dateObj, 'dd MMM yyyy', { locale: es }) : '---'}
-                            </span>
-                            <span className="text-xs text-slate-400 font-medium">
-                              {isDateValid ? format(dateObj, 'HH:mm:ss') : '--:--'}
-                            </span>
+                            <span className="font-bold text-slate-700">{isDateValid ? format(dateObj, 'dd MMM yyyy', { locale: es }) : '---'}</span>
+                            <span className="text-xs text-slate-400 font-medium">{isDateValid ? format(dateObj, 'HH:mm:ss') : '--:--'}</span>
                           </div>
                         </td>
                       </tr>
