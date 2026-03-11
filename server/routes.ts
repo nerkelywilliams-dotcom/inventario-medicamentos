@@ -58,14 +58,19 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     res.json(await storage.getFamilies(location));
   });
 
-  // ✅ NUEVO: RUTA PARA CREAR FAMILIAS (POST)
+  // ✅ NUEVO: RUTA PARA CREAR FAMILIAS (POST) CON LOGS DE DEPURACIÓN
   app.post(api.families.list.path, async (req, res) => {
     try {
+      console.log("Datos recibidos en el servidor (Familias):", req.body); // <-- LOG DE ENTRADA
+      
       const location = req.user?.inventoryLocation || "magdaleno";
       const familyData = insertFamilySchema.parse(req.body);
       const newFamily = await storage.createFamily({ ...familyData, location });
+      
+      console.log("Familia creada exitosamente:", newFamily); // <-- LOG DE ÉXITO
       res.status(201).json(newFamily);
     } catch (err) {
+      console.error("Error detallado en POST /api/families:", err); // <-- LOG DE ERROR
       res.status(400).json({ message: "Error al crear la familia", error: err });
     }
   });
