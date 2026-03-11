@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useLogs } from "@/hooks/use-logs";
+import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { ArrowLeft, Search, ArrowDownLeft, ArrowUpRight, FileEdit, Download } from "lucide-react";
 import { format, isValid } from "date-fns";
@@ -8,14 +8,20 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
 export default function LogsPage() {
-  // Ajuste: si tu hook devuelve { data: ... } extraemos data, si devuelve el array directo, usamos logs
-  const logsHook = useLogs();
-  const logs = (logsHook as any)?.data || (Array.isArray(logsHook) ? logsHook : []);
-  const isLoading = (logsHook as any)?.isLoading ?? false;
+  // ✅ CORRECCIÓN: Definición explícita de la petición para asegurar el flujo de datos
+  const { data: logs, isLoading } = useQuery({
+    queryKey: ["/api/logs"],
+    queryFn: async () => {
+      const res = await fetch("/api/logs");
+      if (!res.ok) throw new Error("Error al obtener logs");
+      return res.json();
+    }
+  });
+
   const [search, setSearch] = useState("");
 
-  // ✅ CORRECCIÓN: Filtro robusto con protección de nulidad
-  const filteredLogs = logs?.filter((log: any) => {
+  // ✅ FILTRO ROBUSTO CON PROTECCIÓN DE NULIDAD
+  const filteredLogs = (logs || []).filter((log: any) => {
     const medName = (log.medicationName || "").toLowerCase();
     const username = (log.user?.username || "").toLowerCase();
     const details = (log.details || "").toLowerCase();
@@ -32,7 +38,7 @@ export default function LogsPage() {
     const tableColumn = ["Acción", "Medicamento", "Detalle", "Responsable", "Fecha"];
     const tableRows: any[] = [];
 
-    filteredLogs?.forEach((log: any) => {
+    filteredLogs.forEach((log: any) => {
       const logData = [
         log.action,
         log.medicationName || "N/A",
@@ -100,7 +106,7 @@ export default function LogsPage() {
           <div className="flex flex-col sm:flex-row items-center gap-3">
             <button 
               onClick={exportToPDF}
-              disabled={!filteredLogs || filteredLogs.length === 0}
+              disabled={filteredLogs.length === 0}
               className="flex items-center gap-2 bg-white text-[#1a2b4b] px-5 py-3 rounded-xl border border-slate-200 font-bold shadow-sm hover:bg-slate-50 transition-all active:scale-95 disabled:opacity-50 w-full sm:w-auto justify-center"
             >
               <Download className="w-4 h-4 text-[#2b4cc4]" /> Exportar PDF
@@ -136,10 +142,10 @@ export default function LogsPage() {
               <tbody className="divide-y divide-slate-50">
                 {isLoading ? (
                   <tr><td colSpan={5} className="p-10 text-center text-slate-400">Cargando historial...</td></tr>
-                ) : filteredLogs?.length === 0 ? (
+                ) : filteredLogs.length === 0 ? (
                   <tr><td colSpan={5} className="p-10 text-center text-slate-400 italic">No se encontraron registros.</td></tr>
                 ) : (
-                  filteredLogs?.map((log: any) => {
+                  filteredLogs.map((log: any) => {
                     const dateObj = new Date(log.timestamp);
                     const isDateValid = isValid(dateObj);
                     return (
