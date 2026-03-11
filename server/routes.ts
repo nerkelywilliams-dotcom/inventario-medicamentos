@@ -58,6 +58,18 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     res.json(await storage.getFamilies(location));
   });
 
+  // ✅ NUEVO: RUTA PARA CREAR FAMILIAS (POST)
+  app.post(api.families.list.path, async (req, res) => {
+    try {
+      const location = req.user?.inventoryLocation || "magdaleno";
+      const familyData = insertFamilySchema.parse(req.body);
+      const newFamily = await storage.createFamily({ ...familyData, location });
+      res.status(201).json(newFamily);
+    } catch (err) {
+      res.status(400).json({ message: "Error al crear la familia", error: err });
+    }
+  });
+
   app.get(api.medications.list.path, async (req, res) => {
     const location = req.user?.inventoryLocation || "magdaleno";
     const meds = await storage.getMedications(req.query.search as string, req.query.familyId as string, location);
@@ -100,7 +112,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
-  // ✅ NUEVO: BORRADO MASIVO (SÓLO ADMINS)
+  // ✅ BORRADO MASIVO (SÓLO ADMINS)
   app.delete('/api/medications/all', async (req, res) => {
     try {
       const isAdmin = req.user?.username === "admin_magdaleno" || req.user?.role === "admin";
