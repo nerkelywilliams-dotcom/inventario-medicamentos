@@ -123,6 +123,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       
       const medicationData = insertMedicationFullSchema.parse(req.body);
       
+      // La lógica de verificar catálogo e insertar inventario reside en storage.createMedication
       const newMedication = await storage.createMedication({
         ...medicationData,
         inventoryLocation: location
@@ -139,8 +140,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
-  // ✅ NUEVA RUTA: ACTUALIZAR MEDICAMENTO (PATCH)
-  // Esta es la que faltaba y por eso no guardaba ni el mecanismo de acción
+  // ACTUALIZAR MEDICAMENTO (PATCH)
   app.patch('/api/medications/:id', async (req, res) => {
     try {
       const id = parseInt(req.params.id);
@@ -150,6 +150,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       // Usamos .partial() para que no sea obligatorio enviar todos los campos
       const updateData = insertMedicationFullSchema.partial().parse(req.body);
       
+      // La lógica de actualizar catálogo e inventario reside en storage.updateMedication
       const updatedMedication = await storage.updateMedication(id, updateData);
       
       console.log("Medicamento actualizado con éxito");
@@ -163,7 +164,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
-  // ✅ NUEVA RUTA: ELIMINAR MEDICAMENTO INDIVIDUAL (DELETE)
+  // ELIMINAR MEDICAMENTO INDIVIDUAL (DELETE)
   app.delete('/api/medications/:id', async (req, res) => {
     try {
       const id = parseInt(req.params.id);
