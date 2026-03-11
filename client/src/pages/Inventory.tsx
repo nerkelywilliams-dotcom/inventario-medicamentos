@@ -56,11 +56,20 @@ export default function Inventory() {
   // Lógica para encontrar y preparar el medicamento a editar
   const editingMedication = medications?.find((m: any) => m.id === editingId);
   
-  // Aplanamos el objeto: extraemos el nombre del catálogo al nivel superior para el formulario
+  // Aplanamos el objeto: extraemos TODOS los campos del catálogo para el formulario
   const formDefaultValues = editingMedication ? {
     ...editingMedication,
     name: editingMedication.catalog?.name || "",
     description: editingMedication.catalog?.description || "",
+    actionMechanism: editingMedication.catalog?.actionMechanism || "",
+    indications: editingMedication.catalog?.indications || "",
+    posology: editingMedication.catalog?.posology || "",
+    contraindications: editingMedication.catalog?.contraindications || "",
+    interactions: editingMedication.catalog?.interactions || "",
+    // Aseguramos formatos correctos para campos específicos
+    quantity: Number(editingMedication.quantity),
+    expirationDate: editingMedication.expirationDate ? new Date(editingMedication.expirationDate) : new Date(),
+    familyId: editingMedication.familyId?.toString()
   } : null;
 
   const filteredMedications = medications?.filter((med: any) => {
@@ -309,7 +318,15 @@ export default function Inventory() {
                 submitLabel="Guardar Cambios"
                 onSubmit={async (data: any) => {
                   try {
-                    await updateMutation.mutateAsync({ id: editingId, ...data });
+                    // Aseguramos que los tipos de datos sean correctos antes de enviar
+                    const formattedData = {
+                      ...data,
+                      familyId: data.familyId ? parseInt(data.familyId) : undefined,
+                      quantity: parseInt(data.quantity)
+                    };
+
+                    await updateMutation.mutateAsync({ id: editingId, ...formattedData });
+                    
                     if (user) {
                       await createLog.mutateAsync({ 
                         action: "EDITAR", 
@@ -317,10 +334,16 @@ export default function Inventory() {
                         userId: user.id 
                       });
                     }
-                    setEditingId(null);
+                    
                     toast({ title: "Actualizado", description: "Cambios guardados correctamente." });
+                    setEditingId(null); // Cerramos el diálogo solo tras el éxito
                   } catch (e) {
-                    toast({ variant: "destructive", title: "Error", description: "No se pudo actualizar." });
+                    console.error("Error al actualizar:", e);
+                    toast({ 
+                      variant: "destructive", 
+                      title: "Error", 
+                      description: "No se pudo actualizar el registro. Inténtalo de nuevo." 
+                    });
                   }
                 }}
               />
