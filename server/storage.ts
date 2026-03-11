@@ -16,9 +16,9 @@ export interface IStorage {
   getMedicationCatalogs(): Promise<MedicationCatalog[]>;
   getMedicationCatalog(id: number): Promise<MedicationCatalog | undefined>;
   getMedicationCatalogByName(name: string): Promise<MedicationCatalog | undefined>;
-  getMedicationCatalogBySearch(searchTerm: string): Promise<MedicationCatalog | undefined>; // ✅ AGREGADO PARA EL AUTOCOMPLETADO
+  getMedicationCatalogBySearch(searchTerm: string): Promise<MedicationCatalog | undefined>;
   createMedicationCatalog(catalog: InsertMedicationCatalog): Promise<MedicationCatalog>;
-  updateMedicationCatalog(id: number, catalog: Partial<InsertMedicationCatalog>): Promise<MedicationCatalog | undefined>; // ✅ NUEVO: Para actualizar fotos y textos
+  updateMedicationCatalog(id: number, catalog: Partial<InsertMedicationCatalog>): Promise<MedicationCatalog | undefined>;
 
   // Families
   getFamilies(inventoryLocation?: string): Promise<Family[]>;
@@ -33,7 +33,8 @@ export interface IStorage {
   createMedication(medication: InsertMedication & { inventoryLocation: string }, catalogId: number): Promise<Medication>;
   updateMedication(id: number, medication: Partial<InsertMedication>): Promise<Medication | undefined>;
   deleteMedication(id: number): Promise<void>;
-  importMedications(items: any[], inventoryLocation: string): Promise<void>; // ✅ NUEVO: Importación masiva
+  importMedications(items: any[], inventoryLocation: string): Promise<void>;
+  deleteAllMedications(inventoryLocation: string): Promise<void>; // ✅ NUEVO: Borrado masivo
 
   // Users
   getUsers(inventoryLocation?: string): Promise<User[]>;
@@ -62,7 +63,6 @@ export class DatabaseStorage implements IStorage {
     return catalog;
   }
 
-  // ✅ AGREGADO: Lógica de búsqueda para el autocompletado en MedicationForm
   async getMedicationCatalogBySearch(searchTerm: string): Promise<MedicationCatalog | undefined> {
     const [catalog] = await db
       .select()
@@ -77,7 +77,6 @@ export class DatabaseStorage implements IStorage {
     return catalog;
   }
 
-  // ✅ NUEVO: Implementación para actualizar el catálogo (imágenes, descripciones, etc.)
   async updateMedicationCatalog(id: number, updates: Partial<InsertMedicationCatalog>): Promise<MedicationCatalog | undefined> {
     const [catalog] = await db
       .update(medicationCatalog)
@@ -121,7 +120,6 @@ export class DatabaseStorage implements IStorage {
   // --- MEDICATIONS ---
   async getMedications(search?: string, familyId?: string, inventoryLocation?: string): Promise<MedicationWithFamily[]> {
     const conditions = [];
-    
     if (familyId) conditions.push(eq(medications.familyId, parseInt(familyId)));
     if (inventoryLocation) conditions.push(eq(medications.inventoryLocation, inventoryLocation));
 
@@ -137,7 +135,6 @@ export class DatabaseStorage implements IStorage {
         med.catalog?.indications?.toLowerCase().includes(search.toLowerCase())
       );
     }
-
     return result;
   }
 
@@ -169,17 +166,14 @@ export class DatabaseStorage implements IStorage {
     await db.delete(medications).where(eq(medications.id, id));
   }
 
-  // ✅ NUEVO: Implementación de importación masiva inteligente
   async importMedications(items: any[], inventoryLocation: string): Promise<void> {
     for (const item of items) {
-      // 1. Verificar si el medicamento ya existe en el catálogo por nombre
       let catalogEntry = await this.getMedicationCatalogByName(item.name);
       let catalogId: number;
 
       if (catalogEntry) {
         catalogId = catalogEntry.id;
       } else {
-        // Si no existe, crear la ficha en el catálogo
         const [newCatalog] = await db.insert(medicationCatalog).values({
           name: item.name,
           description: item.description || null,
@@ -193,7 +187,6 @@ export class DatabaseStorage implements IStorage {
         catalogId = newCatalog.id;
       }
 
-      // 2. Insertar el stock físico en el inventario
       await db.insert(medications).values({
         catalogId: catalogId,
         familyId: item.familyId || null,
@@ -205,6 +198,11 @@ export class DatabaseStorage implements IStorage {
         inventoryLocation: inventoryLocation,
       });
     }
+  }
+
+  // ✅ NUEVO: Lógica para borrar todo el inventario de una sede específica
+  async deleteAllMedications(inventoryLocation: string): Promise<void> {
+    await db.delete(medications).where(eq(medications.inventoryLocation, inventoryLocation));
   }
 
   // --- USERS ---
