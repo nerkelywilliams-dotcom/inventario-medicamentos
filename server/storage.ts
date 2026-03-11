@@ -33,6 +33,7 @@ export interface IStorage {
   createMedication(medication: InsertMedication & { inventoryLocation: string }, catalogId: number): Promise<Medication>;
   updateMedication(id: number, medication: Partial<InsertMedication>): Promise<Medication | undefined>;
   deleteMedication(id: number): Promise<void>;
+  importMedications(items: any[], inventoryLocation: string): Promise<void>; // ✅ NUEVO: Importación masiva
 
   // Users
   getUsers(inventoryLocation?: string): Promise<User[]>;
@@ -166,6 +167,44 @@ export class DatabaseStorage implements IStorage {
 
   async deleteMedication(id: number): Promise<void> {
     await db.delete(medications).where(eq(medications.id, id));
+  }
+
+  // ✅ NUEVO: Implementación de importación masiva inteligente
+  async importMedications(items: any[], inventoryLocation: string): Promise<void> {
+    for (const item of items) {
+      // 1. Verificar si el medicamento ya existe en el catálogo por nombre
+      let catalogEntry = await this.getMedicationCatalogByName(item.name);
+      let catalogId: number;
+
+      if (catalogEntry) {
+        catalogId = catalogEntry.id;
+      } else {
+        // Si no existe, crear la ficha en el catálogo
+        const [newCatalog] = await db.insert(medicationCatalog).values({
+          name: item.name,
+          description: item.description || null,
+          mechanismOfAction: item.mechanismOfAction || null,
+          indications: item.indications || null,
+          posology: item.posology || null,
+          administrationRoute: item.administrationRoute || null,
+          contraindications: item.contraindications || "No especificadas",
+          interactions: item.interactions || "No especificadas",
+        }).returning({ id: medicationCatalog.id });
+        catalogId = newCatalog.id;
+      }
+
+      // 2. Insertar el stock físico en el inventario
+      await db.insert(medications).values({
+        catalogId: catalogId,
+        familyId: item.familyId || null,
+        dose: item.dose || "Ver empaque",
+        presentation: item.presentation,
+        quantity: item.quantity || 0,
+        expirationDate: new Date(item.expirationDate),
+        isPediatric: item.isPediatric || false,
+        inventoryLocation: inventoryLocation,
+      });
+    }
   }
 
   // --- USERS ---
