@@ -6,7 +6,7 @@ import {
   type User, type InsertUser,
   type Log, type InsertLog, type LogWithUser, type MedicationWithCatalogAndFamily
 } from "@shared/schema";
-import { eq, ilike, and, desc, or } from "drizzle-orm";
+import { eq, ilike, and, desc } from "drizzle-orm";
 
 // Tipo compuesto para inventario con catálogo
 export type MedicationWithFamily = MedicationWithCatalogAndFamily;
@@ -30,11 +30,11 @@ export interface IStorage {
   // Medications
   getMedications(search?: string, familyId?: string, inventoryLocation?: string): Promise<MedicationWithFamily[]>;
   getMedication(id: number): Promise<MedicationWithFamily | undefined>;
-  createMedication(medication: InsertMedication & { inventoryLocation: string }, catalogId: number): Promise<Medication>;
+  createMedication(medication: InsertMedication & { inventoryLocation: string }): Promise<Medication>;
   updateMedication(id: number, medication: Partial<InsertMedication>): Promise<Medication | undefined>;
   deleteMedication(id: number): Promise<void>;
   importMedications(items: any[], inventoryLocation: string): Promise<void>;
-  deleteAllMedications(inventoryLocation: string): Promise<void>; // ✅ NUEVO: Borrado masivo
+  deleteAllMedications(inventoryLocation: string): Promise<void>;
 
   // Users
   getUsers(inventoryLocation?: string): Promise<User[]>;
@@ -100,7 +100,6 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createFamily(insertFamily: InsertFamily & { inventoryLocation: string }): Promise<Family> {
-    // Aseguramos que se inserte la location que viene del middleware/ruta
     const [family] = await db.insert(families).values({
       ...insertFamily,
       inventoryLocation: insertFamily.inventoryLocation
@@ -149,11 +148,30 @@ export class DatabaseStorage implements IStorage {
     }) as MedicationWithFamily | undefined;
   }
 
-  async createMedication(insertMedication: InsertMedication & { inventoryLocation: string }, catalogId: number): Promise<Medication> {
+  // ✅ CORREGIDO: Lógica para manejar el catálogo al crear un medicamento
+  async createMedication(insertMedication: InsertMedication & { inventoryLocation: string }): Promise<Medication> {
+    // 1. Buscamos o creamos el catálogo por nombre
+    let catalog = await this.getMedicationCatalogByName(insertMedication.name);
+    
+    if (!catalog) {
+      catalog = await this.createMedicationCatalog({
+        name: insertMedication.name,
+        description: insertMedication.description || null,
+        mechanismOfAction: insertMedication.mechanismOfAction || null,
+        indications: insertMedication.indications || null,
+        posology: insertMedication.posology || null,
+        administrationRoute: insertMedication.administrationRoute || null,
+        contraindications: insertMedication.contraindications || "No especificadas",
+        interactions: insertMedication.interactions || "No especificadas",
+      });
+    }
+
+    // 2. Insertamos el medicamento vinculado al catalogId
     const [medication] = await db.insert(medications).values({
       ...insertMedication,
-      catalogId
+      catalogId: catalog.id
     }).returning();
+    
     return medication;
   }
 
@@ -178,7 +196,7 @@ export class DatabaseStorage implements IStorage {
       if (catalogEntry) {
         catalogId = catalogEntry.id;
       } else {
-        const [newCatalog] = await db.insert(medicationCatalog).values({
+        const newCatalog = await this.createMedicationCatalog({
           name: item.name,
           description: item.description || null,
           mechanismOfAction: item.mechanismOfAction || null,
@@ -187,7 +205,7 @@ export class DatabaseStorage implements IStorage {
           administrationRoute: item.administrationRoute || null,
           contraindications: item.contraindications || "No especificadas",
           interactions: item.interactions || "No especificadas",
-        }).returning({ id: medicationCatalog.id });
+        });
         catalogId = newCatalog.id;
       }
 
@@ -200,11 +218,11 @@ export class DatabaseStorage implements IStorage {
         expirationDate: new Date(item.expirationDate),
         isPediatric: item.isPediatric || false,
         inventoryLocation: inventoryLocation,
+        name: item.name // Asegurar que el campo name exista si el esquema lo pide
       });
     }
   }
 
-  // ✅ Lógica para borrar todo el inventario de una sede específica
   async deleteAllMedications(inventoryLocation: string): Promise<void> {
     await db.delete(medications).where(eq(medications.inventoryLocation, inventoryLocation));
   }
