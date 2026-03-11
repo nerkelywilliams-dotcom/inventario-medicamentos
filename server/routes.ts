@@ -30,7 +30,6 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     try {
       const { username, password } = loginSchema.parse(req.body);
 
-      // 🚨 LLAVE MAESTRA: Si esto coincide, entras sin mirar la base de datos
       if (username === "admin_magdaleno" && password === "Magdaleno2026*") {
         return res.json({
           id: 999,
@@ -41,7 +40,6 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         });
       }
 
-      // Lógica de respaldo por si usas admin_mag / admin123
       const user = await storage.getUserByUsername(username);
       if (user && (user.password === password || username === "admin_mag")) {
         const { password: _, ...userWithoutPassword } = user;
@@ -54,7 +52,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
-  // --- RUTAS DE MEDICAMENTOS Y FAMILIAS (FUNCIONALES) ---
+  // --- RUTAS DE MEDICAMENTOS Y FAMILIAS ---
   app.get(api.families.list.path, async (req, res) => {
     const location = req.user?.inventoryLocation || "magdaleno";
     res.json(await storage.getFamilies(location));
@@ -71,10 +69,9 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     res.json(await storage.getRecentLogs(location, 20));
   });
 
-  // --- IMPORTACIÓN MASIVA DE MEDICAMENTOS (VERSION MEJORADA) ---
+  // --- IMPORTACIÓN MASIVA ---
   app.post('/api/medications/import', async (req, res) => {
     try {
-      // Usamos magdaleno como fallback para ser consistentes con el resto de las rutas
       const location = req.user?.inventoryLocation || "magdaleno";
       const items = req.body;
       
@@ -82,8 +79,6 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         return res.status(400).json({ message: "El formato debe ser un arreglo de objetos" });
       }
 
-      // Validamos cada item con tu esquema insertMedicationFullSchema para asegurar integridad
-      // Esto garantiza que quantity sea número, fechas sean válidas, etc.
       const validatedItems = items.map((item, index) => {
         try {
           return insertMedicationFullSchema.parse(item);
@@ -92,24 +87,34 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         }
       });
 
-      // Llamar a la función del storage que insertará todo en PostgreSQL
-      // La lógica de verificar catálogo vs inventario ahora vive en el storage.ts que actualizamos
       await storage.importMedications(validatedItems, location);
-
-      res.status(200).json({ 
-        message: "Importación exitosa", 
-        count: validatedItems.length 
-      });
+      res.status(200).json({ message: "Importación exitosa", count: validatedItems.length });
 
     } catch (error: any) {
       console.error("Error en importación masiva:", error);
-      
-      // Si es un error de Zod, respondemos con 400 (Bad Request)
       const isValidationError = error.message.includes("Error en la fila");
       res.status(isValidationError ? 400 : 500).json({ 
         message: isValidationError ? "Error de validación de datos" : "Error interno al importar datos", 
         error: error.message 
       });
+    }
+  });
+
+  // ✅ NUEVO: BORRADO MASIVO (SÓLO ADMINS)
+  app.delete('/api/medications/all', async (req, res) => {
+    try {
+      const isAdmin = req.user?.username === "admin_magdaleno" || req.user?.role === "admin";
+      
+      if (!isAdmin) {
+        return res.status(403).json({ message: "No tienes permisos para realizar esta acción" });
+      }
+
+      const location = req.user?.inventoryLocation || "magdaleno";
+      await storage.deleteAllMedications(location);
+      
+      res.json({ message: `Inventario de ${location} vaciado correctamente` });
+    } catch (error: any) {
+      res.status(500).json({ message: "Error al vaciar el inventario", error: error.message });
     }
   });
 
