@@ -53,8 +53,15 @@ export default function Inventory() {
   const createLog = useCreateLog();
   const { toast } = useToast();
 
-  // Encontramos el objeto de edición de forma segura
+  // Lógica para encontrar y preparar el medicamento a editar
   const editingMedication = medications?.find((m: any) => m.id === editingId);
+  
+  // Aplanamos el objeto: extraemos el nombre del catálogo al nivel superior para el formulario
+  const formDefaultValues = editingMedication ? {
+    ...editingMedication,
+    name: editingMedication.catalog?.name || "",
+    description: editingMedication.catalog?.description || "",
+  } : null;
 
   const filteredMedications = medications?.filter((med: any) => {
     const normalize = (str: string) => 
@@ -284,29 +291,43 @@ export default function Inventory() {
         </Table>
       </div>
       
+      {/* Diálogos fuera del mapeo */}
       {detailId && <MedicationDetail medication={medications.find((m:any) => m.id === detailId)} open={!!detailId} onOpenChange={() => setDetailId(null)} />}
       
       {editingId && (
         <Dialog open={!!editingId} onOpenChange={() => setEditingId(null)}>
-          <DialogContent className="max-w-4xl">
+          <DialogContent className="max-w-4xl max-h-[95vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>Editar Medicamento</DialogTitle>
+              <DialogTitle className="text-2xl font-bold text-primary">Editar Medicamento</DialogTitle>
             </DialogHeader>
-            {editingMedication ? (
+            {formDefaultValues ? (
               <MedicationForm 
+                key={`edit-${editingId}`} // Forzamos remount para cargar los nuevos defaultValues
                 families={families}
-                defaultValues={editingMedication}
+                defaultValues={formDefaultValues}
+                isLoading={updateMutation.isPending}
+                submitLabel="Guardar Cambios"
                 onSubmit={async (data: any) => {
-                  await updateMutation.mutateAsync({ id: editingId, ...data });
-                  if (user) {
-                    await createLog.mutateAsync({ action: "EDITAR", details: `Editado: ${data.name || editingMedication.catalog?.name}`, userId: user.id });
+                  try {
+                    await updateMutation.mutateAsync({ id: editingId, ...data });
+                    if (user) {
+                      await createLog.mutateAsync({ 
+                        action: "EDITAR", 
+                        details: `Se actualizó el medicamento: ${data.name || formDefaultValues.name}`, 
+                        userId: user.id 
+                      });
+                    }
+                    setEditingId(null);
+                    toast({ title: "Actualizado", description: "Cambios guardados correctamente." });
+                  } catch (e) {
+                    toast({ variant: "destructive", title: "Error", description: "No se pudo actualizar." });
                   }
-                  setEditingId(null);
-                  toast({ title: "Actualizado", description: "Cambios guardados correctamente." });
                 }}
               />
             ) : (
-              <div className="p-10 text-center">Cargando datos del medicamento...</div>
+              <div className="p-10 text-center text-muted-foreground">
+                Cargando datos del registro...
+              </div>
             )}
           </DialogContent>
         </Dialog>
