@@ -14,6 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { MedicationForm } from "@/components/MedicationForm";
 import { MedicationDetail } from "@/components/MedicationDetail";
 import { ImportarCSV } from "@/components/ImportarCSV";
+import { BorrarInventario } from "@/components/BorrarInventario"; // ✅ AGREGADO
 import { ExpiryBadge, StockBadge } from "@/components/StatusBadges";
 import { Search, Plus, FileDown, Eye, Pencil, Trash2, FilterX, Tag, Baby } from "lucide-react";
 import { format, isValid } from "date-fns";
@@ -42,7 +43,7 @@ export default function Inventory() {
   const medications = (medicationsHook as any)?.data || [];
   const isLoading = (medicationsHook as any)?.isLoading;
 
-  // Obtención de familias (Asegúrate de que este hook esté funcionando)
+  // Obtención de familias
   const familiesHook = useFamilies();
   const families = (familiesHook as any)?.data || [];
   
@@ -126,7 +127,7 @@ export default function Inventory() {
           <h2 className="text-3xl font-display font-bold text-foreground">
             {isUrlPediatricFilter ? (
               <span className="flex items-center gap-2 text-blue-600">
-                < Baby className="h-8 w-8" /> Área Pediátrica
+                <Baby className="h-8 w-8" /> Área Pediátrica
               </span>
             ) : (
               "Gestión de Farmacia"
@@ -136,7 +137,7 @@ export default function Inventory() {
             Sede: <span className="capitalize font-semibold text-primary">{user?.inventoryLocation === 'maracay' ? 'SSIA Maracay' : 'SSIA Magdaleno'}</span>
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {isUrlPediatricFilter && (
             <Button asChild variant="outline" className="border-blue-200 text-blue-600 hover:bg-blue-50">
               <Link href="/inventory">Ver Todo el Inventario</Link>
@@ -149,6 +150,7 @@ export default function Inventory() {
 
           {isAdmin && (
             <>
+              <BorrarInventario /> {/* ✅ AGREGADO: Componente de borrado masivo */}
               <ImportarCSV />
               <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
                 <DialogTrigger asChild>
@@ -163,7 +165,7 @@ export default function Inventory() {
                   <MedicationForm 
                     submitLabel="Registrar Medicamento"
                     isLoading={createMutation.isPending}
-                    families={families} // AGREGADO: Pasamos las familias al formulario
+                    families={families}
                     onSubmit={async (data: any) => {
                       await createMutation.mutateAsync(data);
                       
@@ -308,7 +310,7 @@ export default function Inventory() {
                                 <DialogTitle className="text-2xl font-bold text-amber-600">Editar Registro Médico</DialogTitle>
                               </DialogHeader>
                               <MedicationForm 
-                                families={families} // AGREGADO: También para edición
+                                families={families}
                                 defaultValues={{
                                   name: med.catalog?.name ?? "",
                                   dose: med.dose,
