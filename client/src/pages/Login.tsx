@@ -10,18 +10,23 @@ export default function Login() {
   const [, setLocation] = useLocation();
   const { register, handleSubmit, formState: { isSubmitting } } = useForm();
   const [showPassword, setShowPassword] = useState(false);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null); // Estado para mostrar errores
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
+  // EFECTO DE REDIRECCIÓN: Si el usuario ya está autenticado, enviarlo al dashboard
   useEffect(() => {
-    if (user) setLocation("/");
+    if (user) {
+      // Intentamos redirigir a la ruta principal
+      setLocation("/");
+    }
   }, [user, setLocation]);
 
   const onSubmit = async (data: any) => {
-    setErrorMsg(null); // Limpiar error anterior
+    setErrorMsg(null); 
     try {
-      // Intentar login
+      // Intentar login usando la función del contexto
       await login(data.username, data.password);
-      // Si tiene éxito, useAuth debería disparar el cambio de estado y useEffect redirigirá
+      // Tras el login exitoso, el useEffect de arriba debería detectar 
+      // el cambio en 'user' y realizar la redirección automáticamente.
     } catch (error: any) {
       console.error("Fallo el ingreso:", error);
       // Capturamos el error para mostrarlo al usuario
