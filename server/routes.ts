@@ -113,8 +113,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     res.json(meds);
   });
 
-  // ✅ CORRECCIÓN: RUTA PARA CREAR UN SOLO MEDICAMENTO (POST)
-  // Esta es la ruta que tu formulario de "Nuevo Medicamento" está buscando
+  // ✅ RUTA PARA CREAR UN SOLO MEDICAMENTO (POST)
   app.post(api.medications.list.path, async (req, res) => {
     try {
       console.log("--- INICIO DE CREACIÓN DE MEDICAMENTO ---");
@@ -122,7 +121,6 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       
       const location = req.user?.inventoryLocation || "magdaleno";
       
-      // Validamos los datos con el esquema
       const medicationData = insertMedicationFullSchema.parse(req.body);
       
       const newMedication = await storage.createMedication({
@@ -145,6 +143,18 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   app.get('/api/logs', async (req, res) => {
     const location = req.user?.inventoryLocation || "magdaleno";
     res.json(await storage.getRecentLogs(location, 20));
+  });
+
+  // ✅ AGREGADO: RUTA POST PARA CREAR LOGS
+  app.post('/api/logs', async (req, res) => {
+    try {
+      const { action, details, userId } = req.body;
+      const newLog = await storage.createLog({ action, details, userId });
+      res.status(201).json(newLog);
+    } catch (err) {
+      console.error("Error al guardar log:", err);
+      res.status(400).json({ message: "Error al registrar actividad" });
+    }
   });
 
   // --- IMPORTACIÓN MASIVA ---
