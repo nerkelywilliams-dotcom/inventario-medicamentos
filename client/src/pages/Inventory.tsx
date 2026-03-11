@@ -14,7 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { MedicationForm } from "@/components/MedicationForm";
 import { MedicationDetail } from "@/components/MedicationDetail";
 import { ImportarCSV } from "@/components/ImportarCSV";
-import { BorrarInventario } from "@/components/BorrarInventario"; // ✅ AGREGADO
+import { BorrarInventario } from "@/components/BorrarInventario";
 import { ExpiryBadge, StockBadge } from "@/components/StatusBadges";
 import { Search, Plus, FileDown, Eye, Pencil, Trash2, FilterX, Tag, Baby } from "lucide-react";
 import { format, isValid } from "date-fns";
@@ -47,9 +47,6 @@ export default function Inventory() {
   const familiesHook = useFamilies();
   const families = (familiesHook as any)?.data || [];
   
-  // Diagnóstico en consola
-  console.log("Datos de familias en Inventory:", families);
-
   const createMutation = useCreateMedication();
   const updateMutation = useUpdateMedication();
   const deleteMutation = useDeleteMedication();
@@ -106,17 +103,20 @@ export default function Inventory() {
   const handleDelete = async (id: number) => {
     const medicationToDelete = medications?.find((m: any) => m.id === id);
     if (window.confirm(`¿Estás seguro de eliminar ${medicationToDelete?.catalog?.name}? Esta acción no se puede deshacer.`)) {
-      await deleteMutation.mutateAsync(id);
-      
-      if (user) {
-        createLog.mutate({
-          action: "ELIMINAR",
-          details: `Se eliminó el medicamento: ${medicationToDelete?.catalog?.name || id}`,
-          userId: user.id
-        });
+      try {
+        await deleteMutation.mutateAsync(id);
+        
+        if (user) {
+          await createLog.mutateAsync({
+            action: "ELIMINAR",
+            details: `Se eliminó el medicamento: ${medicationToDelete?.catalog?.name || id}`,
+            userId: user.id
+          });
+        }
+        toast({ title: "Eliminado", description: "El registro ha sido removido del sistema." });
+      } catch (error) {
+        toast({ variant: "destructive", title: "Error", description: "No se pudo completar la operación." });
       }
-
-      toast({ title: "Eliminado", description: "El registro ha sido removido del sistema." });
     }
   };
 
@@ -150,7 +150,7 @@ export default function Inventory() {
 
           {isAdmin && (
             <>
-              <BorrarInventario /> {/* ✅ AGREGADO: Componente de borrado masivo */}
+              <BorrarInventario />
               <ImportarCSV />
               <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
                 <DialogTrigger asChild>
@@ -167,18 +167,20 @@ export default function Inventory() {
                     isLoading={createMutation.isPending}
                     families={families}
                     onSubmit={async (data: any) => {
-                      await createMutation.mutateAsync(data);
-                      
-                      if (user) {
-                        createLog.mutate({
-                          action: "CREAR",
-                          details: `Se registró nuevo medicamento: ${data.name} (${data.dose})`,
-                          userId: user.id
-                        });
+                      try {
+                        await createMutation.mutateAsync(data);
+                        if (user) {
+                          await createLog.mutateAsync({
+                            action: "CREAR",
+                            details: `Se registró nuevo medicamento: ${data.name} (${data.dose})`,
+                            userId: user.id
+                          });
+                        }
+                        setIsCreateOpen(false);
+                        toast({ title: "Éxito", description: "Medicamento registrado correctamente." });
+                      } catch (e) {
+                        toast({ variant: "destructive", title: "Error", description: "No se pudo registrar." });
                       }
-
-                      setIsCreateOpen(false);
-                      toast({ title: "Éxito", description: "Medicamento registrado correctamente." });
                     }}
                   />
                 </DialogContent>
@@ -247,113 +249,27 @@ export default function Inventory() {
             ) : filteredMedications?.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={5} className="h-48 text-center text-muted-foreground">
-                  No se encontraron medicamentos {isUrlPediatricFilter ? "pediátricos" : ""} registrados en esta sede.
+                  No se encontraron medicamentos {isUrlPediatricFilter ? "pediátricos" : ""} registrados.
                 </TableCell>
               </TableRow>
             ) : (
               filteredMedications?.map((med: any) => (
-                <TableRow 
-                  key={med.id} 
-                  className={`group transition-colors hover:bg-primary/5 ${med.isPediatric ? "bg-sky-50/40" : ""}`}
-                >
+                <TableRow key={med.id} className={`group transition-colors hover:bg-primary/5 ${med.isPediatric ? "bg-sky-50/40" : ""}`}>
                   <TableCell>
-                    <div>
-                      <div className="font-semibold text-foreground group-hover:text-primary transition-colors flex items-center gap-2">
-                        {med.catalog?.name} 
-                        <span className="text-muted-foreground font-normal">({med.dose})</span>
-                        {med.isPediatric && (
-                          <Badge variant="outline" className="bg-sky-100 text-sky-700 border-sky-200 text-[10px] font-black uppercase px-2 py-0 h-5 flex items-center gap-0.5 whitespace-nowrap">
-                            <Baby className="h-3 w-3" /> Pediátrico
-                          </Badge>
-                        )}
-                      </div>
-                      <div className="text-xs text-muted-foreground italic">{med.presentation}</div>
+                    <div className="font-semibold text-foreground group-hover:text-primary transition-colors flex items-center gap-2">
+                      {med.catalog?.name} ({med.dose})
                     </div>
                   </TableCell>
-                  <TableCell className="hidden md:table-cell">
-                    {med.family ? (
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-primary/10 text-primary text-[11px] font-bold border border-primary/20 uppercase tracking-wider">
-                        <Tag className="h-3 w-3" />
-                        {med.family.name}
-                      </span>
-                    ) : (
-                      <span className="text-xs text-muted-foreground italic">Sin asignar</span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <StockBadge quantity={med.quantity} />
-                  </TableCell>
-                  <TableCell>
-                    <ExpiryBadge date={med.expirationDate} />
-                  </TableCell>
+                  <TableCell className="hidden md:table-cell">{med.family?.name || "Sin asignar"}</TableCell>
+                  <TableCell><StockBadge quantity={med.quantity} /></TableCell>
+                  <TableCell><ExpiryBadge date={med.expirationDate} /></TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1">
-                      <Dialog open={detailId === med.id} onOpenChange={(open) => setDetailId(open ? med.id : null)}>
-                        <DialogTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-blue-50 hover:text-blue-600 transition-colors">
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                        </DialogTrigger>
-                        <MedicationDetail medication={med} open={detailId === med.id} onOpenChange={(open) => setDetailId(open ? med.id : null)} />
-                      </Dialog>
-                      
+                      <Button variant="ghost" size="icon" onClick={() => setDetailId(med.id)}><Eye className="h-4 w-4" /></Button>
                       {isAdmin && (
                         <>
-                          <Dialog open={editingId === med.id} onOpenChange={(open) => setEditingId(open ? med.id : null)}>
-                            <DialogTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-amber-50 hover:text-amber-600 transition-colors">
-                                <Pencil className="h-4 w-4" />
-                              </Button>
-                            </DialogTrigger>
-                            <DialogContent className="max-w-4xl max-h-[95vh] overflow-y-auto">
-                              <DialogHeader>
-                                <DialogTitle className="text-2xl font-bold text-amber-600">Editar Registro Médico</DialogTitle>
-                              </DialogHeader>
-                              <MedicationForm 
-                                families={families}
-                                defaultValues={{
-                                  name: med.catalog?.name ?? "",
-                                  dose: med.dose,
-                                  presentation: med.presentation,
-                                  quantity: med.quantity,
-                                  expirationDate: med.expirationDate ?? undefined,
-                                  description: med.catalog?.description ?? "",
-                                  mechanismOfAction: med.catalog?.mechanismOfAction ?? "",
-                                  indications: med.catalog?.indications ?? "",
-                                  posology: med.catalog?.posology ?? "",
-                                  administrationRoute: med.catalog?.administrationRoute ?? "",
-                                  contraindications: med.catalog?.contraindications ?? "",
-                                  interactions: med.catalog?.interactions ?? "",
-                                  isPediatric: med.isPediatric ?? false,
-                                  familyId: med.familyId || undefined,
-                                  imageUrl: med.catalog?.imageUrl ?? "",
-                                }}
-                                submitLabel="Guardar Cambios"
-                                isLoading={updateMutation.isPending}
-                                onSubmit={async (data: any) => {
-                                  await updateMutation.mutateAsync({ id: med.id, ...data });
-                                  if (user) {
-                                    createLog.mutate({
-                                      action: "EDITAR",
-                                      details: `Se modificó información de: ${med.catalog?.name}`,
-                                      userId: user.id
-                                    });
-                                  }
-                                  setEditingId(null);
-                                  toast({ title: "Actualizado", description: "Cambios aplicados." });
-                                }}
-                              />
-                            </DialogContent>
-                          </Dialog>
-
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="h-8 w-8 hover:bg-red-50 hover:text-red-600 transition-colors"
-                            onClick={() => handleDelete(med.id)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                          <Button variant="ghost" size="icon" onClick={() => setEditingId(med.id)}><Pencil className="h-4 w-4" /></Button>
+                          <Button variant="ghost" size="icon" onClick={() => handleDelete(med.id)}><Trash2 className="h-4 w-4" /></Button>
                         </>
                       )}
                     </div>
@@ -364,6 +280,27 @@ export default function Inventory() {
           </TableBody>
         </Table>
       </div>
+      
+      {/* Diálogos fuera del mapeo */}
+      {detailId && <MedicationDetail medication={medications.find((m:any) => m.id === detailId)} open={!!detailId} onOpenChange={() => setDetailId(null)} />}
+      {editingId && (
+        <Dialog open={!!editingId} onOpenChange={() => setEditingId(null)}>
+          <DialogContent className="max-w-4xl">
+            <MedicationForm 
+              families={families}
+              defaultValues={medications.find((m:any) => m.id === editingId)}
+              onSubmit={async (data: any) => {
+                await updateMutation.mutateAsync({ id: editingId, ...data });
+                if (user) {
+                  await createLog.mutateAsync({ action: "EDITAR", details: `Editado: ${data.name}`, userId: user.id });
+                }
+                setEditingId(null);
+                toast({ title: "Actualizado" });
+              }}
+            />
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }
