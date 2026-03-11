@@ -71,23 +71,45 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     res.json(await storage.getRecentLogs(location, 20));
   });
 
-  // --- IMPORTACIÓN MASIVA DE MEDICAMENTOS ---
+  // --- IMPORTACIÓN MASIVA DE MEDICAMENTOS (VERSION MEJORADA) ---
   app.post('/api/medications/import', async (req, res) => {
     try {
-      const location = req.user?.inventoryLocation || "maracay";
+      // Usamos magdaleno como fallback para ser consistentes con el resto de las rutas
+      const location = req.user?.inventoryLocation || "magdaleno";
       const items = req.body;
       
       if (!Array.isArray(items)) {
         return res.status(400).json({ message: "El formato debe ser un arreglo de objetos" });
       }
 
-      // Llamar a la función del storage que insertará todo en PostgreSQL
-      await storage.importMedications(items, location);
+      // Validamos cada item con tu esquema insertMedicationFullSchema para asegurar integridad
+      // Esto garantiza que quantity sea número, fechas sean válidas, etc.
+      const validatedItems = items.map((item, index) => {
+        try {
+          return insertMedicationFullSchema.parse(item);
+        } catch (e: any) {
+          throw new Error(`Error en la fila ${index + 1}: ${e.message}`);
+        }
+      });
 
-      res.status(200).json({ message: "Importación exitosa", count: items.length });
+      // Llamar a la función del storage que insertará todo en PostgreSQL
+      // La lógica de verificar catálogo vs inventario ahora vive en el storage.ts que actualizamos
+      await storage.importMedications(validatedItems, location);
+
+      res.status(200).json({ 
+        message: "Importación exitosa", 
+        count: validatedItems.length 
+      });
+
     } catch (error: any) {
       console.error("Error en importación masiva:", error);
-      res.status(500).json({ message: "Error interno al importar datos", error: error.message });
+      
+      // Si es un error de Zod, respondemos con 400 (Bad Request)
+      const isValidationError = error.message.includes("Error en la fila");
+      res.status(isValidationError ? 400 : 500).json({ 
+        message: isValidationError ? "Error de validación de datos" : "Error interno al importar datos", 
+        error: error.message 
+      });
     }
   });
 
