@@ -15,7 +15,7 @@ export default function Login() {
   // EFECTO DE REDIRECCIÓN: Si el usuario ya está autenticado, enviarlo al dashboard
   useEffect(() => {
     if (user) {
-      // Intentamos redirigir a la ruta principal
+      // Forzamos la redirección a la ruta raíz donde está tu Dashboard
       setLocation("/");
     }
   }, [user, setLocation]);
@@ -25,8 +25,7 @@ export default function Login() {
     try {
       // Intentar login usando la función del contexto
       await login(data.username, data.password);
-      // Tras el login exitoso, el useEffect de arriba debería detectar 
-      // el cambio en 'user' y realizar la redirección automáticamente.
+      // Al ser exitoso, el cambio en el estado 'user' disparará el useEffect superior
     } catch (error: any) {
       console.error("Fallo el ingreso:", error);
       // Capturamos el error para mostrarlo al usuario
