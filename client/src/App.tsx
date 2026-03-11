@@ -47,8 +47,9 @@ import Privacy from "@/pages/Privacy";
 
 function Router() {
   const { user, isLoading, logout } = useAuth();
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
 
+  // Si está cargando, mostramos el loader
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -60,7 +61,7 @@ function Router() {
     );
   }
 
-  // ✅ LÓGICA DE RUTA PÚBLICA: Sin SidebarProvider
+  // ✅ LÓGICA DE RUTA PÚBLICA
   if (!user) {
     return (
       <Switch>
@@ -68,6 +69,7 @@ function Router() {
         <Route path="/auth" component={Login} />
         <Route path="/terms" component={Terms} />
         <Route path="/privacy" component={Privacy} />
+        {/* Cualquier ruta desconocida redirige al Landing si no hay usuario */}
         <Route>
           <Redirect to="/" />
         </Route>
@@ -75,7 +77,7 @@ function Router() {
     );
   }
 
-  // ✅ RUTAS PROTEGIDAS: Aquí es donde SI va el SidebarProvider
+  // ✅ RUTAS PROTEGIDAS
   return (
     <SidebarProvider>
       <div className="flex min-h-screen w-full bg-slate-50">
@@ -104,7 +106,7 @@ function Router() {
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
-               
+                
                 <SidebarMenuItem>
                   <SidebarMenuButton asChild isActive={location === "/inventory"} tooltip="Inventario">
                     <Link href="/inventory">
@@ -201,19 +203,20 @@ function Router() {
               <Route path="/" component={Dashboard} />
               <Route path="/inventory" component={Inventory} />
               <Route path="/settings" component={SettingsPage} />
-             
+              
               <Route path="/bitacora">
                 {user.role === 'admin' ? <LogsPage /> : <NotFound />}
               </Route>
-             
+              
               <Route path="/families">
                 {user.role === 'admin' ? <FamiliesPage /> : <NotFound />}
               </Route>
-             
+              
               <Route path="/users">
                 {user.role === 'admin' ? <UsersPage /> : <NotFound />}
               </Route>
-             
+              
+              {/* Ruta comodín para capturar errores de navegación */}
               <Route component={NotFound} />
             </Switch>
           </div>
