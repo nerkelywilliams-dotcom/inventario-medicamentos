@@ -18,7 +18,9 @@ export default function LandingPage() {
     "/jornada-1.jpg",
     "/jornada-2.jpg",
     "/jornada-3.jpg",
-    "/jornada-4.jpg"
+    "/jornada-4.jpg",
+    "/jornada-5.jpg",
+    "/jornada-6.jpg"
   ];
 
   const [currentIndex, setCurrentIndex] = useState(0);
