@@ -8,20 +8,26 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
 export default function LogsPage() {
-  // ✅ CORRECCIÓN: Definición explícita de la petición para asegurar el flujo de datos
-  const { data: logs, isLoading } = useQuery({
+  // ✅ CORRECCIÓN: Definición explícita con captura de errores
+  const { data, isLoading, error } = useQuery({
     queryKey: ["/api/logs"],
     queryFn: async () => {
       const res = await fetch("/api/logs");
-      if (!res.ok) throw new Error("Error al obtener logs");
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(`Error del servidor (${res.status}): ${errorText}`);
+      }
       return res.json();
     }
   });
 
   const [search, setSearch] = useState("");
 
+  // ✅ EXTRACCIÓN SEGURA: Previene crashes si el backend responde con un objeto { data: [...] } en lugar de un Array directo
+  const logsArray = Array.isArray(data) ? data : (data?.data || data?.logs || []);
+
   // ✅ FILTRO ROBUSTO CON PROTECCIÓN DE NULIDAD
-  const filteredLogs = (logs || []).filter((log: any) => {
+  const filteredLogs = logsArray.filter((log: any) => {
     const medName = (log.medicationName || "").toLowerCase();
     const username = (log.user?.username || "").toLowerCase();
     const details = (log.details || "").toLowerCase();
@@ -142,6 +148,8 @@ export default function LogsPage() {
               <tbody className="divide-y divide-slate-50">
                 {isLoading ? (
                   <tr><td colSpan={5} className="p-10 text-center text-slate-400">Cargando historial...</td></tr>
+                ) : error ? (
+                  <tr><td colSpan={5} className="p-10 text-center text-rose-500 font-bold">Error: {(error as Error).message}</td></tr>
                 ) : filteredLogs.length === 0 ? (
                   <tr><td colSpan={5} className="p-10 text-center text-slate-400 italic">No se encontraron registros.</td></tr>
                 ) : (
