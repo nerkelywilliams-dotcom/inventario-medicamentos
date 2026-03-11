@@ -113,7 +113,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     res.json(meds);
   });
 
-  // ✅ RUTA PARA CREAR UN SOLO MEDICAMENTO (POST)
+  // RUTA PARA CREAR UN SOLO MEDICAMENTO (POST)
   app.post(api.medications.list.path, async (req, res) => {
     try {
       console.log("--- INICIO DE CREACIÓN DE MEDICAMENTO ---");
@@ -139,13 +139,49 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
+  // ✅ NUEVA RUTA: ACTUALIZAR MEDICAMENTO (PATCH)
+  // Esta es la que faltaba y por eso no guardaba ni el mecanismo de acción
+  app.patch('/api/medications/:id', async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      console.log(`--- ACTUALIZANDO MEDICAMENTO ID: ${id} ---`);
+      console.log("Datos para actualizar:", req.body);
+
+      // Usamos .partial() para que no sea obligatorio enviar todos los campos
+      const updateData = insertMedicationFullSchema.partial().parse(req.body);
+      
+      const updatedMedication = await storage.updateMedication(id, updateData);
+      
+      console.log("Medicamento actualizado con éxito");
+      res.json(updatedMedication);
+    } catch (err: any) {
+      console.error("ERROR AL ACTUALIZAR MEDICAMENTO:", err);
+      res.status(400).json({ 
+        message: "Error al actualizar el medicamento", 
+        error: err.errors || err.message 
+      });
+    }
+  });
+
+  // ✅ NUEVA RUTA: ELIMINAR MEDICAMENTO INDIVIDUAL (DELETE)
+  app.delete('/api/medications/:id', async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      await storage.deleteMedication(id);
+      res.status(204).end();
+    } catch (err) {
+      console.error("Error al eliminar medicamento:", err);
+      res.status(400).json({ message: "Error al eliminar el medicamento" });
+    }
+  });
+
   // --- LOGS Y AUDITORÍA ---
   app.get('/api/logs', async (req, res) => {
     const location = req.user?.inventoryLocation || "magdaleno";
     res.json(await storage.getRecentLogs(location, 20));
   });
 
-  // ✅ AGREGADO: RUTA POST PARA CREAR LOGS
+  // RUTA POST PARA CREAR LOGS
   app.post('/api/logs', async (req, res) => {
     try {
       const { action, details, userId } = req.body;
@@ -188,7 +224,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
-  // ✅ BORRADO MASIVO (SÓLO ADMINS)
+  // BORRADO MASIVO (SÓLO ADMINS)
   app.delete('/api/medications/all', async (req, res) => {
     try {
       const isAdmin = req.user?.username === "admin_magdaleno" || req.user?.role === "admin";
