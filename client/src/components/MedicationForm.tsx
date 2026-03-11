@@ -54,6 +54,7 @@ export function MedicationForm({ defaultValues, onSubmit, isLoading, submitLabel
       interactions: "",
       isPediatric: false,
       ...defaultValues,
+      // Aseguramos que la fecha sea un string compatible con input type="date" (YYYY-MM-DD)
       expirationDate: defaultValues?.expirationDate 
         ? new Date(defaultValues.expirationDate).toISOString().split('T')[0]
         : "",
@@ -80,22 +81,34 @@ export function MedicationForm({ defaultValues, onSubmit, isLoading, submitLabel
     setSearchTerm(""); 
   };
 
-  const handleSubmit = (data: any) => {
-    const formattedData = {
-      ...data,
-      expirationDate: new Date(data.expirationDate)
-    };
-
-    const file = data.imageUrl;
-    // Si es un archivo nuevo, lo convertimos a Base64 para el backend
-    if (file instanceof File) {
+  // Función auxiliar para convertir File a Base64
+  const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
       const reader = new FileReader();
-      reader.onloadend = () => {
-        onSubmit({ ...formattedData, imageUrl: reader.result as string });
-      };
       reader.readAsDataURL(file);
-    } else {
-      onSubmit(formattedData);
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = (error) => reject(error);
+    });
+  };
+
+  const handleSubmit = async (data: any) => {
+    try {
+      const formattedData = {
+        ...data,
+        // Convertimos el string del input date a un objeto Date real para el backend
+        expirationDate: data.expirationDate ? new Date(data.expirationDate) : null,
+      };
+
+      // Si imageUrl es un File (usuario subió uno nuevo), lo convertimos
+      if (data.imageUrl instanceof File) {
+        const base64 = await fileToBase64(data.imageUrl);
+        await onSubmit({ ...formattedData, imageUrl: base64 });
+      } else {
+        // Si no cambió o es null, enviamos como está
+        await onSubmit(formattedData);
+      }
+    } catch (error) {
+      console.error("Error al procesar el formulario:", error);
     }
   };
 
@@ -227,7 +240,13 @@ export function MedicationForm({ defaultValues, onSubmit, isLoading, submitLabel
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Vencimiento</FormLabel>
-                  <FormControl><Input type="date" {...field} value={field.value instanceof Date ? field.value.toISOString().split('T')[0] : (field.value ?? "")} /></FormControl>
+                  <FormControl>
+                    <Input 
+                      type="date" 
+                      {...field} 
+                      value={field.value instanceof Date ? field.value.toISOString().split('T')[0] : (field.value ?? "")} 
+                    />
+                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
@@ -301,7 +320,7 @@ export function MedicationForm({ defaultValues, onSubmit, isLoading, submitLabel
                             if (file) {
                               onChange(file);
                               
-                              // Generar Preview
+                              // Generar Preview local para la UI
                               const reader = new FileReader();
                               reader.onloadend = () => setPreviewUrl(reader.result as string);
                               reader.readAsDataURL(file);
