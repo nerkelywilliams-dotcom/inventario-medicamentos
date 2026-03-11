@@ -9,41 +9,39 @@ import { useAuth } from "@/context/AuthContext";
 export function useFamilies() {
   const { user } = useAuth();
 
+  // Helper interno para peticiones autenticadas y evitar repetición de código
+  const apiRequest = async (url: string, options: RequestInit = {}) => {
+    const res = await fetch(url, {
+      ...options,
+      headers: {
+        ...options.headers,
+        "Content-Type": "application/json",
+        "x-user": user ? btoa(JSON.stringify(user)) : "",
+      },
+    });
+
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      throw new Error(errorData.message || `Error en la petición: ${res.statusText}`);
+    }
+    return res.status !== 204 ? res.json() : null;
+  };
+
   // 1. Consulta de datos (Obtener todas las familias)
   const query = useQuery<Family[]>({
     queryKey: ["/api/families"],
-    queryFn: async () => {
-      const res = await fetch("/api/families", {
-        headers: {
-          "x-user": btoa(JSON.stringify(user)),
-        },
-      });
-      if (!res.ok) {
-        throw new Error("Error al obtener las familias");
-      }
-      return res.json();
-    },
-    enabled: !!user, 
+    queryFn: () => apiRequest("/api/families"),
+    enabled: !!user,
+    staleTime: 5 * 60 * 1000, // 5 minutos de caché para evitar peticiones redundantes
   });
 
   // 2. Mutación para crear
   const createFamily = useMutation({
-    mutationFn: async (data: InsertFamily) => {
-      const res = await fetch("/api/families", {
+    mutationFn: (data: InsertFamily) => 
+      apiRequest("/api/families", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-user": btoa(JSON.stringify(user)),
-        },
         body: JSON.stringify(data),
-      });
-
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.message || "Error al crear la familia");
-      }
-      return res.json();
-    },
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/families"] });
     },
@@ -51,19 +49,11 @@ export function useFamilies() {
 
   // 3. Mutación para actualizar (Editar)
   const updateFamily = useMutation({
-    mutationFn: async ({ id, ...data }: Partial<InsertFamily> & { id: number }) => {
-      const res = await fetch(`/api/families/${id}`, {
+    mutationFn: ({ id, ...data }: Partial<InsertFamily> & { id: number }) =>
+      apiRequest(`/api/families/${id}`, {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          "x-user": btoa(JSON.stringify(user)),
-        },
         body: JSON.stringify(data),
-      });
-
-      if (!res.ok) throw new Error("Error al actualizar");
-      return res.json();
-    },
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/families"] });
     },
@@ -71,32 +61,32 @@ export function useFamilies() {
 
   // 4. Mutación para eliminar
   const deleteFamily = useMutation({
-    mutationFn: async (id: number) => {
-      const res = await fetch(`/api/families/${id}`, {
-        method: "DELETE",
-        headers: {
-          "x-user": btoa(JSON.stringify(user)),
-        },
-      });
-      if (!res.ok) throw new Error("Error al eliminar");
-    },
+    mutationFn: (id: number) =>
+      apiRequest(`/api/families/${id}`, { method: "DELETE" }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/families"] });
     },
   });
 
-  // Retornamos todo en un solo objeto para que la página lo consuma fácilmente
+  // Retornamos todo en un solo objeto
   return {
-    families: query.data ?? [],
+    data: query.data ?? [], // Alias para 'families' para mayor consistencia con useQuery
+    families: query.data ?? [], // Mantenemos el nombre original
     isLoading: query.isLoading,
+    isError: query.isError,
     error: query.error,
+    refetch: query.refetch,
     createFamily,
     updateFamily,
     deleteFamily
   };
 }
 
-// Mantengo estos exports individuales por si otros componentes los usan por separado
+/**
+ * EXPORTS INDIVIDUALES
+ * Nota: Estos hooks llaman a useFamilies(). Si se usan varios en un mismo componente,
+ * lo ideal es usar useFamilies() directamente para evitar múltiples instancias de la query.
+ */
 export function useCreateFamily() { return useFamilies().createFamily; }
 export function useUpdateFamily() { return useFamilies().updateFamily; }
 export function useDeleteFamily() { return useFamilies().deleteFamily; }
