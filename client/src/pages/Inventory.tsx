@@ -53,6 +53,9 @@ export default function Inventory() {
   const createLog = useCreateLog();
   const { toast } = useToast();
 
+  // Encontramos el objeto de edición de forma segura
+  const editingMedication = medications?.find((m: any) => m.id === editingId);
+
   const filteredMedications = medications?.filter((med: any) => {
     const normalize = (str: string) => 
       str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
@@ -281,23 +284,30 @@ export default function Inventory() {
         </Table>
       </div>
       
-      {/* Diálogos fuera del mapeo */}
       {detailId && <MedicationDetail medication={medications.find((m:any) => m.id === detailId)} open={!!detailId} onOpenChange={() => setDetailId(null)} />}
+      
       {editingId && (
         <Dialog open={!!editingId} onOpenChange={() => setEditingId(null)}>
           <DialogContent className="max-w-4xl">
-            <MedicationForm 
-              families={families}
-              defaultValues={medications.find((m:any) => m.id === editingId)}
-              onSubmit={async (data: any) => {
-                await updateMutation.mutateAsync({ id: editingId, ...data });
-                if (user) {
-                  await createLog.mutateAsync({ action: "EDITAR", details: `Editado: ${data.name}`, userId: user.id });
-                }
-                setEditingId(null);
-                toast({ title: "Actualizado" });
-              }}
-            />
+            <DialogHeader>
+              <DialogTitle>Editar Medicamento</DialogTitle>
+            </DialogHeader>
+            {editingMedication ? (
+              <MedicationForm 
+                families={families}
+                defaultValues={editingMedication}
+                onSubmit={async (data: any) => {
+                  await updateMutation.mutateAsync({ id: editingId, ...data });
+                  if (user) {
+                    await createLog.mutateAsync({ action: "EDITAR", details: `Editado: ${data.name || editingMedication.catalog?.name}`, userId: user.id });
+                  }
+                  setEditingId(null);
+                  toast({ title: "Actualizado", description: "Cambios guardados correctamente." });
+                }}
+              />
+            ) : (
+              <div className="p-10 text-center">Cargando datos del medicamento...</div>
+            )}
           </DialogContent>
         </Dialog>
       )}
