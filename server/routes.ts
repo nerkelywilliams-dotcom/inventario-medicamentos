@@ -55,10 +55,13 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   // --- RUTAS DE MEDICAMENTOS Y FAMILIAS ---
   app.get(api.families.list.path, async (req, res) => {
     const location = req.user?.inventoryLocation || "magdaleno";
-    res.json(await storage.getFamilies(location));
+    const families = await storage.getFamilies(location);
+    // Log para confirmar que el backend está enviando datos reales
+    console.log(`[GET] Enviando ${families.length} familias para la sede: ${location}`);
+    res.json(families);
   });
 
-  // ✅ NUEVO: RUTA PARA CREAR FAMILIAS (POST) CON LOGS DE DEPURACIÓN
+  // ✅ NUEVO: RUTA PARA CREAR FAMILIAS (POST) CORREGIDA
   app.post(api.families.list.path, async (req, res) => {
     try {
       console.log("Datos recibidos en el servidor (Familias):", req.body); 
@@ -66,7 +69,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const location = req.user?.inventoryLocation || "magdaleno";
       const familyData = insertFamilySchema.parse(req.body);
       
-      // Corrección aplicada: Se pasa el campo explícito inventoryLocation
+      // CORRECCIÓN: Usamos inventoryLocation explícitamente para que no se guarde en "maracay" por error
       const newFamily = await storage.createFamily({ ...familyData, inventoryLocation: location });
       
       console.log("Familia creada exitosamente:", newFamily); 
