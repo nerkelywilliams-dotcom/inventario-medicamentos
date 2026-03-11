@@ -71,5 +71,25 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     res.json(await storage.getRecentLogs(location, 20));
   });
 
+  // --- IMPORTACIÓN MASIVA DE MEDICAMENTOS ---
+  app.post('/api/medications/import', async (req, res) => {
+    try {
+      const location = req.user?.inventoryLocation || "maracay";
+      const items = req.body;
+      
+      if (!Array.isArray(items)) {
+        return res.status(400).json({ message: "El formato debe ser un arreglo de objetos" });
+      }
+
+      // Llamar a la función del storage que insertará todo en PostgreSQL
+      await storage.importMedications(items, location);
+
+      res.status(200).json({ message: "Importación exitosa", count: items.length });
+    } catch (error: any) {
+      console.error("Error en importación masiva:", error);
+      res.status(500).json({ message: "Error interno al importar datos", error: error.message });
+    }
+  });
+
   return httpServer;
 }
