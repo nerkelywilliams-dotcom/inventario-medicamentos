@@ -100,7 +100,11 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createFamily(insertFamily: InsertFamily & { inventoryLocation: string }): Promise<Family> {
-    const [family] = await db.insert(families).values(insertFamily).returning();
+    // Aseguramos que se inserte la location que viene del middleware/ruta
+    const [family] = await db.insert(families).values({
+      ...insertFamily,
+      inventoryLocation: insertFamily.inventoryLocation
+    }).returning();
     return family;
   }
 
@@ -200,7 +204,7 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  // ✅ NUEVO: Lógica para borrar todo el inventario de una sede específica
+  // ✅ Lógica para borrar todo el inventario de una sede específica
   async deleteAllMedications(inventoryLocation: string): Promise<void> {
     await db.delete(medications).where(eq(medications.inventoryLocation, inventoryLocation));
   }
