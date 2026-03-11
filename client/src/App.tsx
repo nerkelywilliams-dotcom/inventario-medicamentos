@@ -200,6 +200,7 @@ function Router() {
 
           <div className="max-w-7xl mx-auto p-4 md:p-8 pb-24 md:pb-8">
             <Switch>
+              {/* Rutas protegidas explícitas */}
               <Route path="/" component={Dashboard} />
               <Route path="/inventory" component={Inventory} />
               <Route path="/settings" component={SettingsPage} />
@@ -215,9 +216,11 @@ function Router() {
               <Route path="/users">
                 {user.role === 'admin' ? <UsersPage /> : <NotFound />}
               </Route>
-              
-              {/* Ruta comodín para capturar errores de navegación */}
-              <Route component={NotFound} />
+
+              {/* Si el usuario logueado intenta entrar a /auth o algo que no existe, redirigir a / */}
+              <Route>
+                <Redirect to="/" />
+              </Route>
             </Switch>
           </div>
         </main>
