@@ -20,7 +20,9 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     if (userHeader && typeof userHeader === 'string') {
       try {
         req.user = JSON.parse(Buffer.from(userHeader, 'base64').toString());
-      } catch {}
+      } catch {
+        console.error("Error al parsear el header x-user");
+      }
     }
     next();
   });
@@ -52,40 +54,94 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
-  // --- RUTAS DE MEDICAMENTOS Y FAMILIAS ---
+  // --- RUTAS DE FAMILIAS ---
+  
+  // Listar familias
   app.get(api.families.list.path, async (req, res) => {
     const location = req.user?.inventoryLocation || "magdaleno";
     const families = await storage.getFamilies(location);
-    // Log para confirmar que el backend está enviando datos reales
     console.log(`[GET] Enviando ${families.length} familias para la sede: ${location}`);
     res.json(families);
   });
 
-  // ✅ NUEVO: RUTA PARA CREAR FAMILIAS (POST) CORREGIDA
+  // Crear familia
   app.post(api.families.list.path, async (req, res) => {
     try {
-      console.log("Datos recibidos en el servidor (Familias):", req.body); 
-      
+      console.log("Datos recibidos para nueva familia:", req.body);
       const location = req.user?.inventoryLocation || "magdaleno";
       const familyData = insertFamilySchema.parse(req.body);
       
-      // CORRECCIÓN: Usamos inventoryLocation explícitamente para que no se guarde en "maracay" por error
       const newFamily = await storage.createFamily({ ...familyData, inventoryLocation: location });
-      
-      console.log("Familia creada exitosamente:", newFamily); 
+      console.log("Familia creada exitosamente:", newFamily);
       res.status(201).json(newFamily);
     } catch (err) {
-      console.error("Error detallado en POST /api/families:", err); 
+      console.error("Error en POST /api/families:", err);
       res.status(400).json({ message: "Error al crear la familia", error: err });
     }
   });
 
+  // Actualizar familia (PATCH)
+  app.patch('/api/families/:id', async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const familyData = insertFamilySchema.partial().parse(req.body);
+      const updated = await storage.updateFamily(id, familyData);
+      res.json(updated);
+    } catch (err) {
+      res.status(400).json({ message: "Error al actualizar familia" });
+    }
+  });
+
+  // Eliminar familia (DELETE)
+  app.delete('/api/families/:id', async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      await storage.deleteFamily(id);
+      res.status(204).end();
+    } catch (err) {
+      res.status(400).json({ message: "Error al eliminar familia" });
+    }
+  });
+
+
+  // --- RUTAS DE MEDICAMENTOS ---
+
+  // Listar medicamentos
   app.get(api.medications.list.path, async (req, res) => {
     const location = req.user?.inventoryLocation || "magdaleno";
     const meds = await storage.getMedications(req.query.search as string, req.query.familyId as string, location);
     res.json(meds);
   });
 
+  // ✅ CORRECCIÓN: RUTA PARA CREAR UN SOLO MEDICAMENTO (POST)
+  // Esta es la ruta que tu formulario de "Nuevo Medicamento" está buscando
+  app.post(api.medications.list.path, async (req, res) => {
+    try {
+      console.log("--- INICIO DE CREACIÓN DE MEDICAMENTO ---");
+      console.log("Cuerpo recibido:", req.body);
+      
+      const location = req.user?.inventoryLocation || "magdaleno";
+      
+      // Validamos los datos con el esquema
+      const medicationData = insertMedicationFullSchema.parse(req.body);
+      
+      const newMedication = await storage.createMedication({
+        ...medicationData,
+        inventoryLocation: location
+      });
+
+      console.log("Medicamento creado con éxito ID:", newMedication.id);
+      res.status(201).json(newMedication);
+    } catch (err: any) {
+      console.error("FALLO AL CREAR MEDICAMENTO:", err);
+      res.status(400).json({ 
+        message: "Error al guardar el medicamento", 
+        error: err.errors || err.message 
+      });
+    }
+  });
+
+  // --- LOGS Y AUDITORÍA ---
   app.get('/api/logs', async (req, res) => {
     const location = req.user?.inventoryLocation || "magdaleno";
     res.json(await storage.getRecentLogs(location, 20));
