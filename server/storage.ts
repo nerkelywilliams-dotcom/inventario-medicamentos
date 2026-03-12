@@ -4,7 +4,7 @@ import {
   type Family, type InsertFamily,
   type Medication, type InsertMedication, type MedicationCatalog, type InsertMedicationCatalog,
   type User, type InsertUser,
-  type Log, type InsertLog, type LogWithUser, type MedicationWithCatalogAndFamily
+  type Log, type InsertLog, type LogWithUser, type MedicationWithCatalogAndFamily, type InsertMedicationFull
 } from "@shared/schema";
 import { eq, ilike, and, desc } from "drizzle-orm";
 
@@ -30,8 +30,8 @@ export interface IStorage {
   // Medications
   getMedications(search?: string, familyId?: string, inventoryLocation?: string): Promise<MedicationWithFamily[]>;
   getMedication(id: number): Promise<MedicationWithFamily | undefined>;
-  createMedication(medication: InsertMedication & { inventoryLocation: string }): Promise<Medication>;
-  updateMedication(id: number, medication: Partial<InsertMedication>): Promise<Medication | undefined>;
+  createMedication(medication: InsertMedicationFull & { inventoryLocation: string }): Promise<MedicationWithFamily>;
+  updateMedication(id: number, medication: Partial<InsertMedicationFull>): Promise<MedicationWithFamily | undefined>;
   deleteMedication(id: number): Promise<void>;
   importMedications(items: any[], inventoryLocation: string): Promise<void>;
   deleteAllMedications(inventoryLocation: string): Promise<void>;
@@ -148,40 +148,80 @@ export class DatabaseStorage implements IStorage {
     }) as MedicationWithFamily | undefined;
   }
 
-  // ✅ CORREGIDO: Lógica para manejar el catálogo al crear un medicamento
-  async createMedication(insertMedication: InsertMedication & { inventoryLocation: string }): Promise<Medication> {
+  // ✅ CORREGIDO: Lógica dual para crear catálogo + inventario físico
+  async createMedication(data: InsertMedicationFull & { inventoryLocation: string }): Promise<MedicationWithFamily> {
     // 1. Buscamos o creamos el catálogo por nombre
-    let catalog = await this.getMedicationCatalogByName(insertMedication.name);
+    let [catalogEntry] = await db
+      .select()
+      .from(medicationCatalog)
+      .where(eq(medicationCatalog.name, data.name));
     
-    if (!catalog) {
-      catalog = await this.createMedicationCatalog({
-        name: insertMedication.name,
-        description: insertMedication.description || null,
-        mechanismOfAction: insertMedication.mechanismOfAction || null,
-        indications: insertMedication.indications || null,
-        posology: insertMedication.posology || null,
-        administrationRoute: insertMedication.administrationRoute || null,
-        contraindications: insertMedication.contraindications || "No especificadas",
-        interactions: insertMedication.interactions || "No especificadas",
-      });
+    if (!catalogEntry) {
+      [catalogEntry] = await db.insert(medicationCatalog).values({
+        name: data.name,
+        description: data.description || null,
+        mechanismOfAction: data.mechanismOfAction || null,
+        indications: data.indications || null,
+        posology: data.posology || null,
+        administrationRoute: data.administrationRoute || null,
+        contraindications: data.contraindications || "No especificadas",
+        interactions: data.interactions || "No especificadas",
+        imageUrl: data.imageUrl || null,
+      }).returning();
     }
 
     // 2. Insertamos el medicamento vinculado al catalogId
-    const [medication] = await db.insert(medications).values({
-      ...insertMedication,
-      catalogId: catalog.id
+    const [newMedication] = await db.insert(medications).values({
+      catalogId: catalogEntry.id,
+      familyId: data.familyId || null,
+      dose: data.dose || "Ver empaque",
+      presentation: data.presentation,
+      quantity: data.quantity || 0,
+      expirationDate: data.expirationDate,
+      isPediatric: data.isPediatric || false,
+      inventoryLocation: data.inventoryLocation,
     }).returning();
     
-    return medication;
+    return { ...newMedication, catalog: catalogEntry };
   }
 
-  async updateMedication(id: number, updates: Partial<InsertMedication>): Promise<Medication | undefined> {
-    const [medication] = await db
-      .update(medications)
-      .set(updates)
+  // ✅ CORREGIDO: Lógica dual para actualizar catálogo + inventario físico
+  async updateMedication(id: number, updates: Partial<InsertMedicationFull>): Promise<MedicationWithFamily | undefined> {
+    const current = await this.getMedication(id);
+    if (!current) return undefined;
+
+    // 1. Si hay cambios en la data científica, actualizamos el catálogo
+    if (updates.name || updates.mechanismOfAction || updates.indications || updates.contraindications) {
+      await db.update(medicationCatalog)
+        .set({
+          name: updates.name,
+          description: updates.description,
+          mechanismOfAction: updates.mechanismOfAction,
+          indications: updates.indications,
+          posology: updates.posology,
+          administrationRoute: updates.administrationRoute,
+          contraindications: updates.contraindications,
+          interactions: updates.interactions,
+          imageUrl: updates.imageUrl,
+        })
+        .where(eq(medicationCatalog.id, current.catalogId));
+    }
+
+    // 2. Actualizamos la data específica del inventario (lote)
+    const [updatedMedication] = await db.update(medications)
+      .set({
+        familyId: updates.familyId,
+        dose: updates.dose,
+        presentation: updates.presentation,
+        quantity: updates.quantity,
+        expirationDate: updates.expirationDate,
+        isPediatric: updates.isPediatric,
+      })
       .where(eq(medications.id, id))
       .returning();
-    return medication;
+
+    // 3. Devolvemos el objeto completo actualizado
+    return await this.getMedication(id);
   }
 
   async deleteMedication(id: number): Promise<void> {
@@ -190,35 +230,9 @@ export class DatabaseStorage implements IStorage {
 
   async importMedications(items: any[], inventoryLocation: string): Promise<void> {
     for (const item of items) {
-      let catalogEntry = await this.getMedicationCatalogByName(item.name);
-      let catalogId: number;
-
-      if (catalogEntry) {
-        catalogId = catalogEntry.id;
-      } else {
-        const newCatalog = await this.createMedicationCatalog({
-          name: item.name,
-          description: item.description || null,
-          mechanismOfAction: item.mechanismOfAction || null,
-          indications: item.indications || null,
-          posology: item.posology || null,
-          administrationRoute: item.administrationRoute || null,
-          contraindications: item.contraindications || "No especificadas",
-          interactions: item.interactions || "No especificadas",
-        });
-        catalogId = newCatalog.id;
-      }
-
-      await db.insert(medications).values({
-        catalogId: catalogId,
-        familyId: item.familyId || null,
-        dose: item.dose || "Ver empaque",
-        presentation: item.presentation,
-        quantity: item.quantity || 0,
-        expirationDate: new Date(item.expirationDate),
-        isPediatric: item.isPediatric || false,
-        inventoryLocation: inventoryLocation,
-        name: item.name // Asegurar que el campo name exista si el esquema lo pide
+      await this.createMedication({
+        ...item,
+        inventoryLocation: inventoryLocation
       });
     }
   }
