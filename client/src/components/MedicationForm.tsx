@@ -16,7 +16,7 @@ import { z } from "zod";
 import { useQuery } from "@tanstack/react-query";
 
 interface MedicationFormProps {
-  defaultValues?: Partial<InsertMedicationFull>;
+  defaultValues?: any; // Cambiado a any para manejar la estructura anidada de la DB
   onSubmit: (data: InsertMedicationFull) => Promise<void>;
   isLoading: boolean;
   submitLabel: string;
@@ -36,7 +36,7 @@ export function MedicationForm({ defaultValues, onSubmit, isLoading, submitLabel
   // ✅ ESTADOS PARA CARGA Y VISTA PREVIA
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(defaultValues?.imageUrl || null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -53,26 +53,44 @@ export function MedicationForm({ defaultValues, onSubmit, isLoading, submitLabel
       contraindications: "",
       interactions: "",
       isPediatric: false,
-      ...defaultValues,
-      expirationDate: defaultValues?.expirationDate 
-        ? new Date(defaultValues.expirationDate).toISOString().split('T')[0]
-        : "",
+      expirationDate: "",
     } as any,
   });
 
-  // ✅ CORRECCIÓN CLAVE: Sincronizar el formulario cuando cambian los valores por defecto (al editar)
-  // Esto asegura que el "Mecanismo de Acción" y otros campos aparezcan al abrir el modal
+  // ✅ CORRECCIÓN CLAVE: Sincronizar y APLANAR los datos del catálogo al editar
   useEffect(() => {
     if (defaultValues) {
-      const formattedValues = {
-        ...defaultValues,
+      // Extraemos los datos del catálogo si existen (vienen de la DB anidados)
+      const catalog = defaultValues.catalog || {};
+      
+      const flattenedValues = {
+        // Datos del inventario (nivel superior)
+        id: defaultValues.id,
+        familyId: defaultValues.familyId,
+        dose: defaultValues.dose || "",
+        presentation: defaultValues.presentation || "",
+        quantity: defaultValues.quantity || 0,
+        isPediatric: !!defaultValues.isPediatric,
         expirationDate: defaultValues.expirationDate 
           ? new Date(defaultValues.expirationDate).toISOString().split('T')[0]
           : "",
+
+        // Datos del catálogo (desempaquetados para el formulario)
+        name: catalog.name || defaultValues.name || "",
+        description: catalog.description || "",
+        mechanismOfAction: catalog.mechanismOfAction || "",
+        indications: catalog.indications || "",
+        posology: catalog.posology || "",
+        administrationRoute: catalog.administrationRoute || "",
+        contraindications: catalog.contraindications || "",
+        interactions: catalog.interactions || "",
+        imageUrl: catalog.imageUrl || null,
       };
-      form.reset(formattedValues as any);
-      if (defaultValues.imageUrl) {
-        setPreviewUrl(defaultValues.imageUrl);
+
+      form.reset(flattenedValues as any);
+      
+      if (flattenedValues.imageUrl) {
+        setPreviewUrl(flattenedValues.imageUrl);
       }
     }
   }, [defaultValues, form]);
@@ -108,11 +126,10 @@ export function MedicationForm({ defaultValues, onSubmit, isLoading, submitLabel
 
   const handleSubmit = async (data: any) => {
     try {
-      // ✅ Aseguramos que los campos vacíos se envíen como strings vacíos o null según el esquema
+      // ✅ Aseguramos que los campos vacíos se envíen correctamente
       const formattedData = {
         ...data,
         expirationDate: data.expirationDate ? new Date(data.expirationDate) : null,
-        mechanismOfAction: data.mechanismOfAction || "",
       };
 
       if (data.imageUrl instanceof File) {
