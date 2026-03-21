@@ -57,18 +57,29 @@ export function MedicationForm({ defaultValues, onSubmit, isLoading, submitLabel
     } as any,
   });
 
-  // ✅ CORRECCIÓN CLAVE: Sincronizar y APLANAR los datos del catálogo al editar
+  // ✅ CORRECCIÓN CLAVE: Sincronizar, APLANAR los datos y manejar opciones personalizadas
   useEffect(() => {
     if (defaultValues) {
       // Extraemos los datos del catálogo si existen (vienen de la DB anidados)
       const catalog = defaultValues.catalog || {};
       
+      const presentationValue = defaultValues.presentation || "";
+      const viaValue = catalog.administrationRoute || "";
+
+      // Si el valor no está en la lista predefinida, activamos el modo texto (Input)
+      if (presentationValue && !PRESENTACIONES.includes(presentationValue)) {
+        setIsCustomPresentation(true);
+      }
+      if (viaValue && !VIAS_ADMIN.includes(viaValue)) {
+        setIsCustomVia(true);
+      }
+
       const flattenedValues = {
         // Datos del inventario (nivel superior)
         id: defaultValues.id,
         familyId: defaultValues.familyId,
         dose: defaultValues.dose || "",
-        presentation: defaultValues.presentation || "",
+        presentation: presentationValue,
         quantity: defaultValues.quantity || 0,
         isPediatric: !!defaultValues.isPediatric,
         expirationDate: defaultValues.expirationDate 
@@ -81,7 +92,7 @@ export function MedicationForm({ defaultValues, onSubmit, isLoading, submitLabel
         mechanismOfAction: catalog.mechanismOfAction || "",
         indications: catalog.indications || "",
         posology: catalog.posology || "",
-        administrationRoute: catalog.administrationRoute || "",
+        administrationRoute: viaValue,
         contraindications: catalog.contraindications || "",
         interactions: catalog.interactions || "",
         imageUrl: catalog.imageUrl || null,
@@ -223,7 +234,7 @@ export function MedicationForm({ defaultValues, onSubmit, isLoading, submitLabel
                     <Button type="button" variant="ghost" size="icon" onClick={() => setIsCustomPresentation(false)}><X className="h-4 w-4" /></Button>
                   </div>
                 ) : (
-                  <Select onValueChange={(val) => val === "OTHER" ? setIsCustomPresentation(true) : field.onChange(val)} value={field.value ?? undefined}>
+                  <Select onValueChange={(val) => val === "OTHER" ? setIsCustomPresentation(true) : field.onChange(val)} value={field.value || undefined}>
                     <FormControl><SelectTrigger><SelectValue placeholder="Seleccionar..." /></SelectTrigger></FormControl>
                     <SelectContent>
                       {PRESENTACIONES.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
@@ -300,7 +311,7 @@ export function MedicationForm({ defaultValues, onSubmit, isLoading, submitLabel
                       <Button type="button" variant="ghost" size="icon" onClick={() => setIsCustomVia(false)}><X className="h-4 w-4" /></Button>
                     </div>
                   ) : (
-                    <Select onValueChange={(val) => val === "OTHER" ? setIsCustomVia(true) : field.onChange(val)} value={field.value ?? undefined}>
+                    <Select onValueChange={(val) => val === "OTHER" ? setIsCustomVia(true) : field.onChange(val)} value={field.value || undefined}>
                       <FormControl><SelectTrigger><SelectValue placeholder="Vía..." /></SelectTrigger></FormControl>
                       <SelectContent>
                         {VIAS_ADMIN.map(v => <SelectItem key={v} value={v}>{v}</SelectItem>)}
