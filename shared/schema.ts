@@ -109,7 +109,6 @@ export const insertMedicationSchema = createInsertSchema(medications).omit({
 });
 
 // --- ESQUEMA FULL CORREGIDO (EL QUE USA EL FORMULARIO) ---
-// Se han flexibilizado las validaciones para evitar que el botón de guardado se bloquee silenciosamente
 export const insertMedicationFullSchema = z.object({
   // Campos del catálogo
   name: z.string().min(1, "El nombre del medicamento es requerido"),
@@ -128,7 +127,6 @@ export const insertMedicationFullSchema = z.object({
   interactions: z.preprocess((val) => val === "" || val === null ? "No especificadas" : val, z.string().default("No especificadas")),
   
   // Campos de inventario
-  // Usamos preprocess para que si la dosis llega vacía, use el valor por defecto de la DB
   dose: z.preprocess((val) => (val === "" || val === null ? "Ver empaque" : val), z.string().default("Ver empaque")),
   presentation: z.string().min(1, "La presentación es requerida"),
   
@@ -151,10 +149,12 @@ export const insertFamilySchema = createInsertSchema(families).omit({
 // Usuarios
 export const insertUserSchema = createInsertSchema(users).omit({ id: true });
 
-// Logs
-export const insertLogSchema = createInsertSchema(logs).omit({ 
-  id: true, 
-  timestamp: true 
+// Logs (CORREGIDO: Se hace flexible para evitar errores 400 en el guardado)
+export const insertLogSchema = z.object({
+  userId: z.coerce.number().int().optional().nullable(),
+  action: z.string().min(1, "La acción es requerida"),
+  medicationName: z.preprocess((val) => val ?? "Sistema", z.string().default("Sistema")),
+  details: z.string().optional().nullable(),
 });
 
 // Login
