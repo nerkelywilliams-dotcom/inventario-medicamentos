@@ -137,10 +137,22 @@ export function MedicationForm({ defaultValues, onSubmit, isLoading, submitLabel
 
   const handleSubmit = async (data: any) => {
     try {
-      // ✅ Aseguramos que los campos vacíos se envíen correctamente
+      // ✅ Formateo de fecha robusto para evitar errores de zona horaria
+      let formattedDate = null;
+      if (data.expirationDate) {
+        const dateObj = new Date(data.expirationDate);
+        if (!isNaN(dateObj.getTime())) {
+          formattedDate = dateObj;
+        }
+      }
+
+      // ✅ Aseguramos que los campos opcionales nunca viajen como nulos si tienen default
       const formattedData = {
         ...data,
-        expirationDate: data.expirationDate ? new Date(data.expirationDate) : null,
+        expirationDate: formattedDate,
+        dose: data.dose || "Ver empaque",
+        contraindications: data.contraindications || "No especificadas",
+        interactions: data.interactions || "No especificadas",
       };
 
       if (data.imageUrl instanceof File) {
