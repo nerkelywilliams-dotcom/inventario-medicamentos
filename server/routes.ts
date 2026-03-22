@@ -20,7 +20,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     if (userHeader && typeof userHeader === 'string') {
       try {
         req.user = JSON.parse(Buffer.from(userHeader, 'base64').toString());
-      } catch {
+      } catch (error) {
         console.error("Error al parsear el header x-user");
       }
     }
@@ -123,7 +123,6 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       
       const medicationData = insertMedicationFullSchema.parse(req.body);
       
-      // La lógica de verificar catálogo e insertar inventario reside en storage.createMedication
       const newMedication = await storage.createMedication({
         ...medicationData,
         inventoryLocation: location
@@ -140,23 +139,41 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
+  // ACTUALIZAR MEDICAMENTO (PUT) - Agregado para soportar el método del frontend
+  app.put('/api/medications/:id', async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      console.log(`--- ACTUALIZANDO MEDICAMENTO (PUT) ID: ${id} ---`);
+      
+      // Validamos los datos completos ya que PUT reemplaza el recurso
+      const updateData = insertMedicationFullSchema.parse(req.body);
+      const updatedMedication = await storage.updateMedication(id, updateData);
+      
+      console.log("Medicamento actualizado con éxito (PUT)");
+      res.json(updatedMedication);
+    } catch (err: any) {
+      console.error("ERROR AL ACTUALIZAR MEDICAMENTO (PUT):", err);
+      res.status(400).json({ 
+        message: "Error al actualizar el medicamento", 
+        error: err.errors || err.message 
+      });
+    }
+  });
+
   // ACTUALIZAR MEDICAMENTO (PATCH)
   app.patch('/api/medications/:id', async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      console.log(`--- ACTUALIZANDO MEDICAMENTO ID: ${id} ---`);
+      console.log(`--- ACTUALIZANDO MEDICAMENTO (PATCH) ID: ${id} ---`);
       console.log("Datos para actualizar:", req.body);
 
-      // Usamos .partial() para que no sea obligatorio enviar todos los campos
       const updateData = insertMedicationFullSchema.partial().parse(req.body);
-      
-      // La lógica de actualizar catálogo e inventario reside en storage.updateMedication
       const updatedMedication = await storage.updateMedication(id, updateData);
       
-      console.log("Medicamento actualizado con éxito");
+      console.log("Medicamento actualizado con éxito (PATCH)");
       res.json(updatedMedication);
     } catch (err: any) {
-      console.error("ERROR AL ACTUALIZAR MEDICAMENTO:", err);
+      console.error("ERROR AL ACTUALIZAR MEDICAMENTO (PATCH):", err);
       res.status(400).json({ 
         message: "Error al actualizar el medicamento", 
         error: err.errors || err.message 
