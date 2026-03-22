@@ -109,6 +109,7 @@ export const insertMedicationSchema = createInsertSchema(medications).omit({
 });
 
 // --- ESQUEMA FULL CORREGIDO (EL QUE USA EL FORMULARIO) ---
+// Se han flexibilizado las validaciones para evitar que el botón de guardado se bloquee silenciosamente
 export const insertMedicationFullSchema = z.object({
   // Campos del catálogo
   name: z.string().min(1, "El nombre del medicamento es requerido"),
@@ -123,14 +124,15 @@ export const insertMedicationFullSchema = z.object({
   administrationRoute: z.string().optional().nullable(),
   
   // Ajuste para coincidir con los defaults de la DB si vienen vacíos
-  contraindications: z.string().optional().nullable().transform(val => val ?? "No especificadas"),
-  interactions: z.string().optional().nullable().transform(val => val ?? "No especificadas"),
+  contraindications: z.preprocess((val) => val === "" || val === null ? "No especificadas" : val, z.string().default("No especificadas")),
+  interactions: z.preprocess((val) => val === "" || val === null ? "No especificadas" : val, z.string().default("No especificadas")),
   
   // Campos de inventario
-  dose: z.string().min(1, "La dosis es requerida").default("Ver empaque"),
+  // Usamos preprocess para que si la dosis llega vacía, use el valor por defecto de la DB
+  dose: z.preprocess((val) => (val === "" || val === null ? "Ver empaque" : val), z.string().default("Ver empaque")),
   presentation: z.string().min(1, "La presentación es requerida"),
   
-  // Coerción mejorada
+  // Coerción mejorada para asegurar que siempre sean números
   quantity: z.coerce.number().int().min(0, "El stock no puede ser negativo").default(0),
   expirationDate: z.coerce.date({
     required_error: "La fecha de vencimiento es requerida",
