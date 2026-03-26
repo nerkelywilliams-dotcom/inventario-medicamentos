@@ -4,6 +4,7 @@ import { LogWithUser } from "@shared/schema";
 // Definimos qué datos necesita la bitácora para crear un registro
 type CreateLogInput = {
   action: string;
+  medicationName: string; // <-- Agregado: Requerido obligatoriamente por tu base de datos
   details: string;
   userId: number;
 };
