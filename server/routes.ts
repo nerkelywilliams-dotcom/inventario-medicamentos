@@ -199,11 +199,25 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     res.json(await storage.getRecentLogs(location, 20));
   });
 
-  // RUTA POST PARA CREAR LOGS
+  // RUTA POST PARA CREAR LOGS (CORREGIDA PARA SOPORTAR medicationName Y medicationId)
   app.post('/api/logs', async (req, res) => {
     try {
-      const { action, details, userId } = req.body;
-      const newLog = await storage.createLog({ action, details, userId });
+      const { action, details, userId, medicationName, medicationId } = req.body;
+      
+      // Validamos que venga el nombre del medicamento para evitar el error de base de datos
+      if (!medicationName) {
+        console.error("Error: Se intentó crear un log sin medicationName");
+        return res.status(400).json({ message: "El nombre del medicamento es requerido" });
+      }
+
+      const newLog = await storage.createLog({ 
+        action, 
+        details, 
+        userId: Number(userId), 
+        medicationName, 
+        medicationId: medicationId ? Number(medicationId) : null 
+      });
+      
       res.status(201).json(newLog);
     } catch (err) {
       console.error("Error al guardar log:", err);
