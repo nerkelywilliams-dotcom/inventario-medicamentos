@@ -11,12 +11,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { Switch } from "@/components/ui/switch";
-import { Loader2, X, Pill, Activity, AlertOctagon, RefreshCw, Baby, Sparkles, CheckCircle2, Image as ImageIcon, Trash2 } from "lucide-react";
+import { Loader2, X, Pill, Activity, AlertOctagon, RefreshCw, Baby, Sparkles, CheckCircle2, Image as ImageIcon, Trash2, Save } from "lucide-react";
 import { z } from "zod";
 import { useQuery } from "@tanstack/react-query";
 
 interface MedicationFormProps {
-  defaultValues?: any; // Cambiado a any para manejar la estructura anidada de la DB
+  defaultValues?: any; 
   onSubmit: (data: InsertMedicationFull) => Promise<void>;
   isLoading: boolean;
   submitLabel: string;
@@ -33,7 +33,6 @@ export function MedicationForm({ defaultValues, onSubmit, isLoading, submitLabel
   const [isCustomVia, setIsCustomVia] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   
-  // ✅ ESTADOS PARA CARGA Y VISTA PREVIA
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -57,16 +56,12 @@ export function MedicationForm({ defaultValues, onSubmit, isLoading, submitLabel
     } as any,
   });
 
-  // ✅ CORRECCIÓN CLAVE: Sincronizar, APLANAR los datos y manejar opciones personalizadas
   useEffect(() => {
     if (defaultValues) {
-      // Extraemos los datos del catálogo si existen (vienen de la DB anidados)
       const catalog = defaultValues.catalog || {};
-      
       const presentationValue = defaultValues.presentation || "";
       const viaValue = catalog.administrationRoute || "";
 
-      // Si el valor no está en la lista predefinida, activamos el modo texto (Input)
       if (presentationValue && !PRESENTACIONES.includes(presentationValue)) {
         setIsCustomPresentation(true);
       }
@@ -75,7 +70,6 @@ export function MedicationForm({ defaultValues, onSubmit, isLoading, submitLabel
       }
 
       const flattenedValues = {
-        // Datos del inventario (nivel superior)
         id: defaultValues.id,
         familyId: defaultValues.familyId,
         dose: defaultValues.dose || "",
@@ -85,8 +79,6 @@ export function MedicationForm({ defaultValues, onSubmit, isLoading, submitLabel
         expirationDate: defaultValues.expirationDate 
           ? new Date(defaultValues.expirationDate).toISOString().split('T')[0]
           : "",
-
-        // Datos del catálogo (desempaquetados para el formulario)
         name: catalog.name || defaultValues.name || "",
         description: catalog.description || "",
         mechanismOfAction: catalog.mechanismOfAction || "",
@@ -137,7 +129,6 @@ export function MedicationForm({ defaultValues, onSubmit, isLoading, submitLabel
 
   const handleSubmit = async (data: any) => {
     try {
-      // ✅ Formateo de fecha robusto para evitar errores de zona horaria
       let formattedDate = null;
       if (data.expirationDate) {
         const dateObj = new Date(data.expirationDate);
@@ -146,7 +137,6 @@ export function MedicationForm({ defaultValues, onSubmit, isLoading, submitLabel
         }
       }
 
-      // ✅ Aseguramos que los campos opcionales nunca viajen como nulos si tienen default
       const formattedData = {
         ...data,
         expirationDate: formattedDate,
@@ -170,7 +160,6 @@ export function MedicationForm({ defaultValues, onSubmit, isLoading, submitLabel
     <Form {...form}>
       <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* NOMBRE COMERCIAL Y AUTOCOMPLETADO */}
           <FormField
             control={form.control}
             name="name"
@@ -374,7 +363,6 @@ export function MedicationForm({ defaultValues, onSubmit, isLoading, submitLabel
                               const reader = new FileReader();
                               reader.onloadend = () => setPreviewUrl(reader.result as string);
                               reader.readAsDataURL(file);
-
                               setIsUploading(true);
                               setUploadProgress(0);
                               const interval = setInterval(() => {
@@ -459,8 +447,8 @@ export function MedicationForm({ defaultValues, onSubmit, isLoading, submitLabel
               name="contraindications"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="flex items-center gap-2 text-destructive font-bold"><AlertOctagon className="h-4 w-4" /> Contraindicaciones</FormLabel>
-                  <FormControl><Textarea className="h-24 border-destructive/20" {...field} value={field.value ?? ""} /></FormControl>
+                  <FormLabel className="text-red-600 flex items-center gap-2 font-bold"><AlertOctagon className="h-4 w-4" /> Contraindicaciones</FormLabel>
+                  <FormControl><Textarea className="h-20 border-red-100 focus-visible:ring-red-200" {...field} value={field.value ?? ""} /></FormControl>
                   <FormMessage />
                 </FormItem>
               )}
@@ -470,33 +458,22 @@ export function MedicationForm({ defaultValues, onSubmit, isLoading, submitLabel
               name="interactions"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="flex items-center gap-2 text-amber-600 font-bold"><RefreshCw className="h-4 w-4" /> Interacciones</FormLabel>
-                  <FormControl><Textarea className="h-24 border-amber-200" {...field} value={field.value ?? ""} /></FormControl>
+                  <FormLabel className="text-orange-600 flex items-center gap-2 font-bold"><RefreshCw className="h-4 w-4" /> Interacciones</FormLabel>
+                  <FormControl><Textarea className="h-20 border-orange-100 focus-visible:ring-orange-200" {...field} value={field.value ?? ""} /></FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
           </div>
-
-          <FormField
-            control={form.control}
-            name="description"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Descripción Adicional</FormLabel>
-                <FormControl><Textarea className="h-20" {...field} value={field.value ?? ""} /></FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
         </div>
 
-        <div className="flex justify-end pt-4">
-          <Button type="submit" disabled={isLoading || (isUploading && uploadProgress < 100)} className="w-full md:w-auto px-8 font-bold">
-            {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {submitLabel}
-          </Button>
-        </div>
+        <Button type="submit" className="w-full h-12 text-lg font-bold shadow-lg transition-all active:scale-[0.98]" disabled={isLoading}>
+          {isLoading ? (
+            <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Guardando...</>
+          ) : (
+            <><Save className="mr-2 h-5 w-5" /> {submitLabel}</>
+          )}
+        </Button>
       </form>
     </Form>
   );
