@@ -263,23 +263,39 @@ export class DatabaseStorage implements IStorage {
     await db.delete(users).where(eq(users.id, id));
   }
 
-  // --- LOGS IMPLEMENTATION ---
+  // --- LOGS IMPLEMENTATION (VERSION CORREGIDA PARA VISIBILIDAD) ---
   async createLog(insertLog: InsertLog): Promise<Log> {
-    const [newLog] = await db.insert(logs).values(insertLog).returning();
+    // Intentamos detectar la sede para que el log sea visible en la bitácora de esa sede
+    let location = "magdaleno"; 
+    
+    if (insertLog.medicationId) {
+      const med = await this.getMedication(insertLog.medicationId);
+      if (med) {
+        location = med.inventoryLocation;
+      }
+    }
+
+    const [newLog] = await db.insert(logs).values({
+      ...insertLog,
+      inventoryLocation: insertLog.inventoryLocation || location,
+      timestamp: new Date()
+    }).returning();
+    
     return newLog;
   }
 
-  async getRecentLogs(inventoryLocation?: string, limit = 10): Promise<LogWithUser[]> {
-    const allLogs = await db.query.logs.findMany({
+  async getRecentLogs(inventoryLocation?: string, limit = 20): Promise<LogWithUser[]> {
+    const queryConditions = [];
+    if (inventoryLocation) {
+      queryConditions.push(eq(logs.inventoryLocation, inventoryLocation));
+    }
+
+    return await db.query.logs.findMany({
+      where: queryConditions.length > 0 ? and(...queryConditions) : undefined,
       orderBy: desc(logs.timestamp),
-      with: { user: true }
+      with: { user: true },
+      limit: limit
     }) as LogWithUser[];
-
-    const filtered = inventoryLocation
-      ? allLogs.filter(l => l.user?.inventoryLocation === inventoryLocation)
-      : allLogs;
-
-    return filtered.slice(0, limit);
   }
 }
 
