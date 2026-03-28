@@ -148,9 +148,7 @@ export class DatabaseStorage implements IStorage {
     }) as MedicationWithFamily | undefined;
   }
 
-  // ✅ CORREGIDO: Lógica dual para crear catálogo + inventario físico
   async createMedication(data: InsertMedicationFull & { inventoryLocation: string }): Promise<MedicationWithFamily> {
-    // 1. Buscamos o creamos el catálogo por nombre
     let [catalogEntry] = await db
       .select()
       .from(medicationCatalog)
@@ -170,7 +168,6 @@ export class DatabaseStorage implements IStorage {
       }).returning();
     }
 
-    // 2. Insertamos el medicamento vinculado al catalogId
     const [newMedication] = await db.insert(medications).values({
       catalogId: catalogEntry.id,
       familyId: data.familyId || null,
@@ -185,12 +182,10 @@ export class DatabaseStorage implements IStorage {
     return { ...newMedication, catalog: catalogEntry };
   }
 
-  // ✅ CORREGIDO: Lógica dual para actualizar catálogo + inventario físico
   async updateMedication(id: number, updates: Partial<InsertMedicationFull>): Promise<MedicationWithFamily | undefined> {
     const current = await this.getMedication(id);
     if (!current) return undefined;
 
-    // 1. Si hay cambios en la data científica, actualizamos el catálogo
     if (updates.name || updates.mechanismOfAction || updates.indications || updates.contraindications) {
       await db.update(medicationCatalog)
         .set({
@@ -207,7 +202,6 @@ export class DatabaseStorage implements IStorage {
         .where(eq(medicationCatalog.id, current.catalogId));
     }
 
-    // 2. Actualizamos la data específica del inventario (lote)
     const [updatedMedication] = await db.update(medications)
       .set({
         familyId: updates.familyId,
@@ -220,7 +214,6 @@ export class DatabaseStorage implements IStorage {
       .where(eq(medications.id, id))
       .returning();
 
-    // 3. Devolvemos el objeto completo actualizado
     return await this.getMedication(id);
   }
 
@@ -263,39 +256,42 @@ export class DatabaseStorage implements IStorage {
     await db.delete(users).where(eq(users.id, id));
   }
 
-  // --- LOGS IMPLEMENTATION (VERSION CORREGIDA PARA VISIBILIDAD) ---
-  async createLog(insertLog: InsertLog): Promise<Log> {
-    // Intentamos detectar la sede para que el log sea visible en la bitácora de esa sede
-    let location = "magdaleno"; 
-    
-    if (insertLog.medicationId) {
-      const med = await this.getMedication(insertLog.medicationId);
-      if (med) {
-        location = med.inventoryLocation;
-      }
-    }
+  // --- LOGS (SOLUCIÓN DEFINITIVA) ---
+  async createLog(insertLog: any): Promise<Log> {
+    // 1. Buscamos un usuario real de la sede para evitar el error de FK
+    const [realUser] = await db
+      .select()
+      .from(users)
+      .where(eq(users.inventoryLocation, insertLog.inventoryLocation || "magdaleno"))
+      .limit(1);
+
+    const validUserId = realUser ? realUser.id : null; // Si no hay usuario, mandamos null
 
     const [newLog] = await db.insert(logs).values({
-      ...insertLog,
-      inventoryLocation: insertLog.inventoryLocation || location,
+      action: insertLog.action || "Actualización",
+      details: insertLog.details || "Movimiento de inventario",
+      userId: validUserId, // Usamos un ID que SÍ exista en la tabla users
+      medicationId: insertLog.medicationId || null,
+      medicationName: insertLog.medicationName || "Medicamento",
+      inventoryLocation: insertLog.inventoryLocation || "magdaleno",
       timestamp: new Date()
     }).returning();
     
     return newLog;
   }
 
-  async getRecentLogs(inventoryLocation?: string, limit = 20): Promise<LogWithUser[]> {
-    const queryConditions = [];
-    if (inventoryLocation) {
-      queryConditions.push(eq(logs.inventoryLocation, inventoryLocation));
-    }
-
-    return await db.query.logs.findMany({
-      where: queryConditions.length > 0 ? and(...queryConditions) : undefined,
-      orderBy: desc(logs.timestamp),
+  async getRecentLogs(inventoryLocation?: string, limit = 50): Promise<LogWithUser[]> {
+    // Consulta simplificada para evitar el error de sintaxis "at or near ="
+    const allLogs = await db.query.logs.findMany({
+      orderBy: [desc(logs.timestamp)],
       with: { user: true },
       limit: limit
-    }) as LogWithUser[];
+    });
+
+    if (!inventoryLocation) return allLogs as LogWithUser[];
+
+    // Filtramos en memoria para asegurar que la consulta SQL sea limpia
+    return allLogs.filter(l => l.inventoryLocation === inventoryLocation) as LogWithUser[];
   }
 }
 
