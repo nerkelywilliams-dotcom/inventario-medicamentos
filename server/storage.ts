@@ -256,24 +256,25 @@ export class DatabaseStorage implements IStorage {
     await db.delete(users).where(eq(users.id, id));
   }
 
-  // --- LOGS (SOLUCIÓN DEFINITIVA) ---
+  // --- LOGS (Versión Final sin bloqueos) ---
   async createLog(insertLog: any): Promise<Log> {
-    // 1. Buscamos un usuario real de la sede para evitar el error de FK
-    const [realUser] = await db
+    // 1. Buscamos el usuario admin que acabamos de crear en el deploy para asegurar el ID
+    const [adminUser] = await db
       .select()
       .from(users)
-      .where(eq(users.inventoryLocation, insertLog.inventoryLocation || "magdaleno"))
+      .where(eq(users.username, "admin_mag"))
       .limit(1);
 
-    const validUserId = realUser ? realUser.id : null; // Si no hay usuario, mandamos null
+    const validUserId = adminUser ? adminUser.id : null;
 
+    // 2. Insertamos asegurando que la acción y sede no sean nulas
     const [newLog] = await db.insert(logs).values({
-      action: insertLog.action || "Actualización",
-      details: insertLog.details || "Movimiento de inventario",
-      userId: validUserId, // Usamos un ID que SÍ exista en la tabla users
+      action: insertLog.action || "ACTUALIZACIÓN",
+      details: insertLog.details || "Cambio en inventario",
+      userId: validUserId,
       medicationId: insertLog.medicationId || null,
       medicationName: insertLog.medicationName || "Medicamento",
-      inventoryLocation: insertLog.inventoryLocation || "magdaleno",
+      inventoryLocation: insertLog.inventoryLocation || "magdaleno", // Forzamos magdaleno si viene vacío
       timestamp: new Date()
     }).returning();
     
@@ -281,17 +282,22 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getRecentLogs(inventoryLocation?: string, limit = 50): Promise<LogWithUser[]> {
-    // Consulta simplificada para evitar el error de sintaxis "at or near ="
+    // Traemos los logs con sus usuarios directamente de la DB
     const allLogs = await db.query.logs.findMany({
       orderBy: [desc(logs.timestamp)],
-      with: { user: true },
+      with: { 
+        user: true 
+      },
       limit: limit
     });
 
+    // Si no hay sede especificada, devolvemos todo
     if (!inventoryLocation) return allLogs as LogWithUser[];
 
-    // Filtramos en memoria para asegurar que la consulta SQL sea limpia
-    return allLogs.filter(l => l.inventoryLocation === inventoryLocation) as LogWithUser[];
+    // Filtramos comparando en minúsculas para evitar errores de "Magdaleno" vs "magdaleno"
+    return allLogs.filter(l => 
+      l.inventoryLocation?.toLowerCase() === inventoryLocation.toLowerCase()
+    ) as LogWithUser[];
   }
 }
 
