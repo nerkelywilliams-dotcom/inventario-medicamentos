@@ -94,7 +94,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   });
 
 
-  // --- RUTAS DE MEDICAMENTOS ---
+  // --- RUTAS DE MEDICAMENTOS (CON AUTO-LOGGING) ---
   app.get(api.medications.list.path, async (req, res) => {
     const location = req.user?.inventoryLocation || "magdaleno";
     const meds = await storage.getMedications(req.query.search as string, req.query.familyId as string, location);
@@ -106,6 +106,16 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const location = req.user?.inventoryLocation || "magdaleno";
       const medicationData = insertMedicationFullSchema.parse(req.body);
       const newMedication = await storage.createMedication({ ...medicationData, inventoryLocation: location });
+
+      // LOG AUTOMÁTICO: Evita el "Sin nombre"
+      await storage.createLog({
+        action: "Creación",
+        details: `Nuevo ingreso: ${newMedication.stock} unidades`,
+        userId: req.user?.id || 999,
+        medicationName: medicationData.name || "Nuevo Medicamento",
+        medicationId: newMedication.id
+      }).catch(e => console.error("Error silencioso en log:", e));
+
       res.status(201).json(newMedication);
     } catch (err: any) {
       res.status(400).json({ message: "Error al guardar el medicamento", error: err.message });
@@ -117,6 +127,16 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const id = parseInt(req.params.id);
       const updateData = insertMedicationFullSchema.parse(req.body);
       const updatedMedication = await storage.updateMedication(id, updateData);
+
+      // LOG AUTOMÁTICO PARA EDICIÓN
+      await storage.createLog({
+        action: "Actualización",
+        details: `Stock actualizado a ${updateData.stock}`,
+        userId: req.user?.id || 999,
+        medicationName: updateData.name,
+        medicationId: id
+      }).catch(e => console.error("Error silencioso en log:", e));
+
       res.json(updatedMedication);
     } catch (err: any) {
       res.status(400).json({ message: "Error al actualizar el medicamento" });
@@ -128,6 +148,18 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const id = parseInt(req.params.id);
       const updateData = insertMedicationFullSchema.partial().parse(req.body);
       const updatedMedication = await storage.updateMedication(id, updateData);
+      
+      // Intentamos registrar si hay datos suficientes
+      if (updateData.name || updateData.stock !== undefined) {
+         await storage.createLog({
+          action: "Modificación Parcial",
+          details: updateData.stock !== undefined ? `Stock: ${updateData.stock}` : "Cambio de datos",
+          userId: req.user?.id || 999,
+          medicationName: updateData.name || "Medicamento ID: " + id,
+          medicationId: id
+        }).catch(() => null);
+      }
+
       res.json(updatedMedication);
     } catch (err: any) {
       res.status(400).json({ message: "Error al actualizar el medicamento" });
@@ -153,17 +185,18 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
   app.post('/api/logs', async (req, res) => {
     try {
-      // Extraemos todo, incluso variaciones de nombres
-      const { action, details, userId, medicationId, medicationName, medication_name } = req.body;
+      // Extraemos todo, incluso variaciones de nombres para evitar el "Sin nombre"
+      const { action, details, userId, medicationId, medicationName, medication_name, name } = req.body;
       
-      let finalMedName = medicationName || medication_name;
+      let finalMedName = medicationName || medication_name || name;
 
-      // Si no hay nombre, intentamos buscarlo por ID desesperadamente
+      // Si no hay nombre pero hay ID, buscamos con lógica más robusta
       if (!finalMedName && medicationId) {
         try {
           const med = await storage.getMedication(Number(medicationId));
-          if (med && med.catalog) {
-            finalMedName = med.catalog.name;
+          if (med) {
+            // Intentamos varias rutas donde podría estar el nombre según tu schema
+            finalMedName = med.name || (med.catalog && med.catalog.name) || `Medicamento #${medicationId}`;
           }
         } catch (dbErr) {
           console.error("No se pudo recuperar nombre de la DB:", dbErr);
@@ -178,7 +211,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const logEntry = {
         action: action || "Acción registrada",
         details: details || "Cambio en inventario",
-        userId: userId ? Number(userId) : 999,
+        userId: userId ? Number(userId) : (req.user?.id || 999),
         medicationName: finalMedName,
         medicationId: medicationId ? Number(medicationId) : null
       };
@@ -187,7 +220,6 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       res.status(201).json(newLog);
       
     } catch (err) {
-      // Captura final: Si algo falla aquí, devolvemos 201 falso para no romper el Frontend
       console.error("Fallo total en bitácora, enviando respuesta segura:", err);
       res.status(201).json({ message: "Log ignorado por seguridad" });
     }
