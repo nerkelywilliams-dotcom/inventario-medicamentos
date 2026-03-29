@@ -139,6 +139,7 @@ export function MedicationForm({ defaultValues, onSubmit, isLoading, submitLabel
 
       const formattedData = {
         ...data,
+        medicationName: data.name, // <-- SOLUCIÓN: Agregamos explícitamente esto para la bitácora
         expirationDate: formattedDate,
         dose: data.dose || "Ver empaque",
         contraindications: data.contraindications || "No especificadas",
@@ -147,9 +148,9 @@ export function MedicationForm({ defaultValues, onSubmit, isLoading, submitLabel
 
       if (data.imageUrl instanceof File) {
         const base64 = await fileToBase64(data.imageUrl);
-        await onSubmit({ ...formattedData, imageUrl: base64 });
+        await onSubmit({ ...formattedData, imageUrl: base64 } as any);
       } else {
-        await onSubmit(formattedData);
+        await onSubmit(formattedData as any);
       }
     } catch (error) {
       console.error("Error al procesar el formulario:", error);
