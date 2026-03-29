@@ -94,11 +94,23 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   });
 
 
-  // --- RUTAS DE MEDICAMENTOS (AUTO-LOGGING MEJORADO) ---
+  // --- RUTAS DE MEDICAMENTOS (CON LOGS REFORZADOS) ---
   app.get(api.medications.list.path, async (req, res) => {
     const location = req.user?.inventoryLocation || "magdaleno";
     const meds = await storage.getMedications(req.query.search as string, req.query.familyId as string, location);
     res.json(meds);
+  });
+
+  // Nueva ruta para obtener un medicamento individual (útil para detalles)
+  app.get('/api/medications/:id', async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const med = await storage.getMedication(id);
+      if (!med) return res.status(404).json({ message: "No encontrado" });
+      res.json(med);
+    } catch (err) {
+      res.status(400).json({ message: "ID inválido" });
+    }
   });
 
   app.post(api.medications.list.path, async (req, res) => {
@@ -129,7 +141,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
       await storage.createLog({
         action: "EDITAR",
-        details: `Se actualizó el medicamento: ${updateData.name}`,
+        details: `Se actualizó el medicamento completo: ${updateData.name}`,
         userId: req.user?.id || 109,
         medicationName: updateData.name,
         medicationId: id
@@ -145,17 +157,20 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     try {
       const id = parseInt(req.params.id);
       const updateData = insertMedicationFullSchema.partial().parse(req.body);
+      
+      // ✅ MEJORA: Buscamos el nombre actual antes de actualizar para el Log
+      const currentMed = await storage.getMedication(id);
+      const medicationName = updateData.name || currentMed?.name || "Medicamento Desconocido";
+
       const updatedMedication = await storage.updateMedication(id, updateData);
       
-      if (updateData.name) {
-         await storage.createLog({
-          action: "EDITAR",
-          details: `Cambio parcial en: ${updateData.name}`,
-          userId: req.user?.id || 109,
-          medicationName: updateData.name,
-          medicationId: id
-        }).catch(() => null);
-      }
+      await storage.createLog({
+        action: "EDITAR",
+        details: `Cambio parcial (Stock/Datos) en: ${medicationName}`,
+        userId: req.user?.id || 109,
+        medicationName: medicationName,
+        medicationId: id
+      }).catch(() => null);
 
       res.json(updatedMedication);
     } catch (err: any) {
@@ -166,6 +181,18 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   app.delete('/api/medications/:id', async (req, res) => {
     try {
       const id = parseInt(req.params.id);
+      // Opcional: Registrar quién eliminó
+      const medToDelete = await storage.getMedication(id);
+      if (medToDelete) {
+          await storage.createLog({
+            action: "ELIMINAR",
+            details: `Se eliminó del inventario: ${medToDelete.name}`,
+            userId: req.user?.id || 109,
+            medicationName: medToDelete.name,
+            medicationId: id
+          }).catch(() => null);
+      }
+      
       await storage.deleteMedication(id);
       res.status(204).end();
     } catch (err) {
@@ -174,10 +201,10 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   });
 
 
-  // --- BITÁCORA (EXTRACCIÓN INTELIGENTE DE NOMBRES) ---
+  // --- BITÁCORA (CON LÓGICA DE RESCATE DE DATOS) ---
   app.get('/api/logs', async (req, res) => {
     const location = req.user?.inventoryLocation || "magdaleno";
-    const logs = await storage.getRecentLogs(location, 20);
+    const logs = await storage.getRecentLogs(location, 50); // Aumentado a 50 para mejor visibilidad
     res.json(logs);
   });
 
@@ -185,22 +212,21 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     try {
       const { action, details, userId, medicationId, medicationName, name } = req.body;
       
-      // Lógica de "Búsqueda Desesperada" del nombre
       let finalMedName = medicationName || name;
 
-      // Si no viene nombre, pero está en los detalles (ej: "Se actualizó...: Lidocaína")
+      // 1. Si no hay nombre, intentamos sacarlo de los detalles
       if (!finalMedName && details && details.includes(": ")) {
         finalMedName = details.split(": ").pop();
       }
 
-      // Si aún no hay nombre pero hay ID, lo buscamos en la DB
+      // 2. Si sigue sin haber nombre pero hay ID, lo buscamos en la DB
       if (!finalMedName && medicationId) {
         try {
           const med = await storage.getMedication(Number(medicationId));
           if (med) {
-            finalMedName = med.name || (med.catalog && med.catalog.name);
+            finalMedName = med.name;
           }
-        } catch (e) { console.log("DB lookup failed for log"); }
+        } catch (e) { console.log("Fallo búsqueda en DB para bitácora"); }
       }
 
       const logEntry = {
@@ -216,11 +242,12 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       
     } catch (err) {
       console.error("Fallo crítico en bitácora:", err);
-      res.status(201).json({ message: "Log fallido pero ignorado para no romper el flujo" });
+      // Retornamos 201 de todas formas para que la interfaz no se bloquee si falla un log
+      res.status(201).json({ message: "Log no guardado pero proceso continuado" });
     }
   });
 
-  // --- OTRAS RUTAS ---
+  // --- IMPORTACIÓN Y MANTENIMIENTO ---
   app.post('/api/medications/import', async (req, res) => {
     try {
       const location = req.user?.inventoryLocation || "magdaleno";
@@ -237,10 +264,10 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   app.delete('/api/medications/all', async (req, res) => {
     try {
       const isAdmin = req.user?.role === "admin" || req.user?.username === "admin_magdaleno";
-      if (!isAdmin) return res.status(403).json({ message: "No autorizado" });
+      if (!isAdmin) return res.status(403).json({ message: "No autorizado para vaciar inventario" });
       const location = req.user?.inventoryLocation || "magdaleno";
       await storage.deleteAllMedications(location);
-      res.json({ message: "Inventario vaciado" });
+      res.json({ message: "Inventario vaciado por completo" });
     } catch (error: any) {
       res.status(500).json({ message: "Error al vaciar", error: error.message });
     }
