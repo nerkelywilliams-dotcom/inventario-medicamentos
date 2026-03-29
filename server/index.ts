@@ -23,7 +23,7 @@ declare module "http" {
   }
 }
 
-// ✅ CORRECCIÓN: Se añade 'limit' para permitir fotos de medicamentos pesadas (10MB)
+// ✅ CORRECCIÓN: Se mantiene el 'limit' para permitir fotos de medicamentos pesadas (10MB)
 app.use(
   express.json({
     limit: "10mb", 
@@ -33,7 +33,7 @@ app.use(
   }),
 );
 
-// ✅ CORRECCIÓN: Se añade 'limit' también aquí para formularios extensos
+// ✅ CORRECCIÓN: Se mantiene el 'limit' para formularios extensos
 app.use(express.urlencoded({ limit: "10mb", extended: false }));
 
 export function log(message: string, source = "express") {
@@ -73,38 +73,43 @@ app.use((req, res, next) => {
   next();
 });
 
-// --- FUNCIÓN DE INYECCIÓN CORREGIDA ---
+// --- FUNCIÓN DE INYECCIÓN CORREGIDA (LÓGICA UPSERT) ---
 async function seedAdminUser() {
   try {
     const scryptAsync = promisify(scrypt);
-    console.log("🔍 Limpiando e inyectando usuario admin_mag...");
+    console.log("🔍 Verificando usuario admin_mag...");
 
-    // 1. Borramos el usuario anterior para evitar conflictos
-    await db.delete(users).where(eq(users.username, "admin_mag"));
+    // 1. Buscamos si ya existe para evitar error de llave foránea (Foreign Key Constraint)
+    const [existingUser] = await db.select().from(users).where(eq(users.username, "admin_mag")).limit(1);
 
-    // 2. Creamos la encriptación fresca
     const salt = randomBytes(16).toString("hex");
     const buf = (await scryptAsync("admin123", salt, 64)) as Buffer;
     const hashedPassword = `${buf.toString("hex")}.${salt}`;
 
-    // 3. Insertamos de nuevo usando 'inventoryLocation' en lugar de 'sede'
-    await db.insert(users).values({
+    const adminValues = {
       username: "admin_mag",
       password: hashedPassword,
       role: "admin",
       inventoryLocation: "SSIA Magdaleno", 
-    });
-    
-    console.log("✅ ¡ÉXITO! El usuario 'admin_mag' ha sido re-creado con admin123.");
+    };
+
+    if (existingUser) {
+      // 2. Si existe, solo actualizamos los datos básicos
+      await db.update(users).set(adminValues).where(eq(users.id, existingUser.id));
+      console.log("✅ Usuario 'admin_mag' actualizado (Upsert).");
+    } else {
+      // 3. Si no existe, lo insertamos
+      await db.insert(users).values(adminValues);
+      console.log("✅ Usuario 'admin_mag' creado con éxito.");
+    }
   } catch (error) {
-    console.error("❌ Error en la inyección:", error);
+    console.error("❌ Error en la inyección (controlado):", error);
   }
 }
 // --------------------------------------
 
 (async () => {
   try {
-    // Ejecutamos la inyección ANTES de que el servidor acepte conexiones
     console.log('🔄 Inicializando base de datos...');
     await seedAdminUser();
     console.log('✅ Base de datos inicializada');
@@ -118,7 +123,6 @@ async function seedAdminUser() {
       const message = err.message || "Internal Server Error";
       console.error('❌ Error:', message);
       res.status(status).json({ message });
-      throw err;
     });
 
     if (process.env.NODE_ENV === "production") {
@@ -140,7 +144,7 @@ async function seedAdminUser() {
         reusePort: true,
       },
       () => {
-        log(`🚀 Servidor corriendo en puerto ${port}`);
+        log(`🚀 Servidor MediStock corriendo en puerto ${port}`);
         log(`📱 Modo: ${process.env.NODE_ENV || 'development'}`);
       },
     );
