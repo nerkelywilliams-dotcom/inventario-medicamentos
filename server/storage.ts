@@ -256,9 +256,8 @@ export class DatabaseStorage implements IStorage {
     await db.delete(users).where(eq(users.id, id));
   }
 
-  // --- LOGS (Versión Final sin bloqueos) ---
+  // --- LOGS ---
   async createLog(insertLog: any): Promise<Log> {
-    // 1. Buscamos el usuario admin que acabamos de crear en el deploy para asegurar el ID
     const [adminUser] = await db
       .select()
       .from(users)
@@ -267,14 +266,13 @@ export class DatabaseStorage implements IStorage {
 
     const validUserId = adminUser ? adminUser.id : null;
 
-    // 2. Insertamos asegurando que la acción y sede no sean nulas
     const [newLog] = await db.insert(logs).values({
       action: insertLog.action || "ACTUALIZACIÓN",
       details: insertLog.details || "Cambio en inventario",
       userId: validUserId,
       medicationId: insertLog.medicationId || null,
       medicationName: insertLog.medicationName || "Medicamento",
-      inventoryLocation: insertLog.inventoryLocation || "magdaleno", // Forzamos magdaleno si viene vacío
+      inventoryLocation: insertLog.inventoryLocation || "magdaleno", 
       timestamp: new Date()
     }).returning();
     
@@ -282,7 +280,6 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getRecentLogs(inventoryLocation?: string, limit = 50): Promise<LogWithUser[]> {
-    // Traemos los logs con sus usuarios directamente de la DB
     const allLogs = await db.query.logs.findMany({
       orderBy: [desc(logs.timestamp)],
       with: { 
@@ -291,12 +288,12 @@ export class DatabaseStorage implements IStorage {
       limit: limit
     });
 
-    // Si no hay sede especificada, devolvemos todo
     if (!inventoryLocation) return allLogs as LogWithUser[];
 
-    // Filtramos comparando en minúsculas para evitar errores de "Magdaleno" vs "magdaleno"
+    // SOLUCIÓN: Filtro ultra-permisivo. Si la columna inventoryLocation no existe 
+    // en la DB (!l.inventoryLocation), entonces NO lo filtramos, lo mostramos igual.
     return allLogs.filter(l => 
-      l.inventoryLocation?.toLowerCase() === inventoryLocation.toLowerCase()
+      !l.inventoryLocation || l.inventoryLocation.toLowerCase() === inventoryLocation.toLowerCase()
     ) as LogWithUser[];
   }
 }
