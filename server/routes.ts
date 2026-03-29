@@ -94,7 +94,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   });
 
 
-  // --- RUTAS DE MEDICAMENTOS (CON AUTO-LOGGING) ---
+  // --- RUTAS DE MEDICAMENTOS (AUTO-LOGGING MEJORADO) ---
   app.get(api.medications.list.path, async (req, res) => {
     const location = req.user?.inventoryLocation || "magdaleno";
     const meds = await storage.getMedications(req.query.search as string, req.query.familyId as string, location);
@@ -107,14 +107,13 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const medicationData = insertMedicationFullSchema.parse(req.body);
       const newMedication = await storage.createMedication({ ...medicationData, inventoryLocation: location });
 
-      // LOG AUTOMÁTICO: Evita el "Sin nombre"
       await storage.createLog({
         action: "Creación",
-        details: `Nuevo ingreso: ${newMedication.stock} unidades`,
-        userId: req.user?.id || 999,
-        medicationName: medicationData.name || "Nuevo Medicamento",
+        details: `Nuevo ingreso: ${newMedication.quantity || 0} unidades`,
+        userId: req.user?.id || 109,
+        medicationName: medicationData.name,
         medicationId: newMedication.id
-      }).catch(e => console.error("Error silencioso en log:", e));
+      }).catch(console.error);
 
       res.status(201).json(newMedication);
     } catch (err: any) {
@@ -128,14 +127,13 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const updateData = insertMedicationFullSchema.parse(req.body);
       const updatedMedication = await storage.updateMedication(id, updateData);
 
-      // LOG AUTOMÁTICO PARA EDICIÓN
       await storage.createLog({
-        action: "Actualización",
-        details: `Stock actualizado a ${updateData.stock}`,
-        userId: req.user?.id || 999,
+        action: "EDITAR",
+        details: `Se actualizó el medicamento: ${updateData.name}`,
+        userId: req.user?.id || 109,
         medicationName: updateData.name,
         medicationId: id
-      }).catch(e => console.error("Error silencioso en log:", e));
+      }).catch(console.error);
 
       res.json(updatedMedication);
     } catch (err: any) {
@@ -149,13 +147,12 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const updateData = insertMedicationFullSchema.partial().parse(req.body);
       const updatedMedication = await storage.updateMedication(id, updateData);
       
-      // Intentamos registrar si hay datos suficientes
-      if (updateData.name || updateData.stock !== undefined) {
+      if (updateData.name) {
          await storage.createLog({
-          action: "Modificación Parcial",
-          details: updateData.stock !== undefined ? `Stock: ${updateData.stock}` : "Cambio de datos",
-          userId: req.user?.id || 999,
-          medicationName: updateData.name || "Medicamento ID: " + id,
+          action: "EDITAR",
+          details: `Cambio parcial en: ${updateData.name}`,
+          userId: req.user?.id || 109,
+          medicationName: updateData.name,
           medicationId: id
         }).catch(() => null);
       }
@@ -177,42 +174,40 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   });
 
 
-  // --- LOGS Y AUDITORÍA (SISTEMA BLINDADO) ---
+  // --- BITÁCORA (EXTRACCIÓN INTELIGENTE DE NOMBRES) ---
   app.get('/api/logs', async (req, res) => {
     const location = req.user?.inventoryLocation || "magdaleno";
-    res.json(await storage.getRecentLogs(location, 20));
+    const logs = await storage.getRecentLogs(location, 20);
+    res.json(logs);
   });
 
   app.post('/api/logs', async (req, res) => {
     try {
-      // Extraemos todo, incluso variaciones de nombres para evitar el "Sin nombre"
-      const { action, details, userId, medicationId, medicationName, medication_name, name } = req.body;
+      const { action, details, userId, medicationId, medicationName, name } = req.body;
       
-      let finalMedName = medicationName || medication_name || name;
+      // Lógica de "Búsqueda Desesperada" del nombre
+      let finalMedName = medicationName || name;
 
-      // Si no hay nombre pero hay ID, buscamos con lógica más robusta
+      // Si no viene nombre, pero está en los detalles (ej: "Se actualizó...: Lidocaína")
+      if (!finalMedName && details && details.includes(": ")) {
+        finalMedName = details.split(": ").pop();
+      }
+
+      // Si aún no hay nombre pero hay ID, lo buscamos en la DB
       if (!finalMedName && medicationId) {
         try {
           const med = await storage.getMedication(Number(medicationId));
           if (med) {
-            // Intentamos varias rutas donde podría estar el nombre según tu schema
-            finalMedName = med.name || (med.catalog && med.catalog.name) || `Medicamento #${medicationId}`;
+            finalMedName = med.name || (med.catalog && med.catalog.name);
           }
-        } catch (dbErr) {
-          console.error("No se pudo recuperar nombre de la DB:", dbErr);
-        }
-      }
-
-      // SI TODO FALLA, usamos un valor por defecto para QUE NO EXPLOTE
-      if (!finalMedName) {
-        finalMedName = "Medicamento (Sin nombre)";
+        } catch (e) { console.log("DB lookup failed for log"); }
       }
 
       const logEntry = {
         action: action || "Acción registrada",
         details: details || "Cambio en inventario",
-        userId: userId ? Number(userId) : (req.user?.id || 999),
-        medicationName: finalMedName,
+        userId: userId ? Number(userId) : (req.user?.id || 109),
+        medicationName: finalMedName || "Medicamento (Sin nombre)",
         medicationId: medicationId ? Number(medicationId) : null
       };
 
@@ -220,12 +215,12 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       res.status(201).json(newLog);
       
     } catch (err) {
-      console.error("Fallo total en bitácora, enviando respuesta segura:", err);
-      res.status(201).json({ message: "Log ignorado por seguridad" });
+      console.error("Fallo crítico en bitácora:", err);
+      res.status(201).json({ message: "Log fallido pero ignorado para no romper el flujo" });
     }
   });
 
-  // --- IMPORTACIÓN MASIVA ---
+  // --- OTRAS RUTAS ---
   app.post('/api/medications/import', async (req, res) => {
     try {
       const location = req.user?.inventoryLocation || "magdaleno";
