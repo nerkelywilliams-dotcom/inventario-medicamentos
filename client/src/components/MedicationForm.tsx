@@ -300,6 +300,22 @@ export function MedicationForm({ defaultValues, onSubmit, isLoading, submitLabel
 
         <div className="space-y-4 pt-4 border-t">
           <h3 className="font-bold text-lg flex items-center gap-2 text-muted-foreground">📚 Ficha Farmacológica</h3>
+          
+          {/* ✅ NUEVO: CAMPO DE DESCRIPCIÓN AÑADIDO AQUÍ */}
+          <FormField
+            control={form.control}
+            name="description"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Descripción General</FormLabel>
+                <FormControl>
+                  <Textarea className="h-20" placeholder="Breve descripción del medicamento..." {...field} value={field.value ?? ""} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <FormField
               control={form.control}
