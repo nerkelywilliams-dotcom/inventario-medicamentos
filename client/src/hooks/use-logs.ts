@@ -9,13 +9,23 @@ type CreateLogInput = {
   userId: number;
 };
 
-// 1. Hook para LEER la bitácora (el que ya tenías)
+// 1. Hook para LEER la bitácora (CORREGIDO: Se añadió queryFn para que cargue automáticamente)
 export function useLogs() {
   return useQuery<LogWithUser[]>({
     queryKey: ["/api/logs"],
+    // ✅ AGREGADO: Esta función es la que realmente busca los datos en el servidor
+    queryFn: async () => {
+      const res = await fetch("/api/logs");
+      if (!res.ok) {
+        throw new Error("Error al obtener la bitácora");
+      }
+      return res.json();
+    },
     // Se refresca cada 10 segundos para ver cambios casi en tiempo real
     refetchInterval: 10000, 
-    retry: 1 
+    retry: 1,
+    // Asegura que se dispare la búsqueda apenas el componente (Dashboard) se monte
+    staleTime: 0 
   });
 }
 
