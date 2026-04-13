@@ -6,14 +6,22 @@ import { Pill, AlertCircle, AlertTriangle, Clock, ArrowDownLeft, ArrowUpRight, F
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 import { differenceInDays, isAfter, format, isValid } from "date-fns";
 import { es } from "date-fns/locale";
+import { useEffect } from "react";
 
 export default function Dashboard() {
   const { data: medications } = useMedications();
-  const { isAdmin } = useAuth();
+  const { isAdmin, user } = useAuth();
   
-  // ✅ SOLO CARGAR LOGS SI ES ADMIN
-  const { data: logs, isLoading: isLoadingLogs } = useLogs();
+  // ✅ CARGA DE LOGS CON REFETCH FORZADO AL MONTAR
+  const { data: logs, isLoading: isLoadingLogs, refetch: refetchLogs } = useLogs();
   
+  // Forzar actualización al entrar al Dashboard para evitar el "blanco"
+  useEffect(() => {
+    if (isAdmin) {
+      refetchLogs();
+    }
+  }, [isAdmin, refetchLogs]);
+
   const now = new Date();
 
   const total = medications?.length || 0;
@@ -78,14 +86,17 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* LISTA DE VENCIMIENTO CORREGIDA */}
+        {/* LISTA DE VENCIMIENTO */}
         <div className="bg-[#fcfdfe] rounded-[3.5rem] p-12 border border-slate-50 shadow-sm">
           <div className="flex items-center gap-3 mb-10">
             <Clock className="text-[#dc2626] w-7 h-7" />
             <h3 className="text-2xl font-black text-[#1a2b4b]">Próximos a Vencer</h3>
           </div>
           <div className="space-y-4">
-            {medications?.filter(m => differenceInDays(new Date(m.expirationDate), now) <= 60).slice(0, 5).map(med => {
+            {medications?.filter(m => {
+              const date = new Date(m.expirationDate);
+              return isValid(date) && differenceInDays(date, now) <= 60;
+            }).slice(0, 5).map(med => {
               const days = differenceInDays(new Date(med.expirationDate), now);
               return (
                 <div key={med.id} className="flex items-center justify-between p-5 bg-white rounded-2xl border border-slate-100 shadow-sm transition-colors hover:border-red-100 hover:bg-red-50/10">
@@ -94,9 +105,8 @@ export default function Dashboard() {
                       <Pill size={20} className="rotate-45" />
                     </div>
                     <div>
-                      {/* ✅ CORRECCIÓN: Se usa med.catalog.name en lugar de med.name */}
                       <p className="font-bold text-[#1a2b4b] text-base leading-tight">
-                        {med.catalog?.name || "Medicamento"}
+                        {med.catalog?.name || med.name || "Medicamento"}
                       </p>
                       <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">{med.presentation}</p>
                     </div>
@@ -127,15 +137,15 @@ export default function Dashboard() {
                 </div>
                 <div>
                     <h3 className="text-2xl font-black text-[#1a2b4b]">Bitácora de Movimientos</h3>
-                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Últimos cambios registrados</p>
+                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Vistazo rápido de actividad</p>
                 </div>
             </div>
             
             <div className="flex items-center gap-4">
-                {isLoadingLogs && <RefreshCw className="h-4 w-4 animate-spin text-slate-400" />}
+                {isLoadingLogs && <RefreshCw className="h-4 w-4 animate-spin text-[#2b4cc4]" />}
                 <Link href="/bitacora">
                     <a className="text-sm font-bold text-[#2b4cc4] hover:text-[#1a2b4b] hover:underline transition-colors flex items-center gap-1 cursor-pointer">
-                        Ver todo <ArrowUpRight className="w-3 h-3" />
+                        Ver bitácora completa <ArrowUpRight className="w-3 h-3" />
                     </a>
                 </Link>
             </div>
@@ -152,39 +162,51 @@ export default function Dashboard() {
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
+                    {/* Cargando datos... */}
+                    {isLoadingLogs && (!logs || logs.length === 0) && (
+                      <tr>
+                        <td colSpan={4} className="py-20 text-center">
+                          <div className="flex flex-col items-center gap-3">
+                            <RefreshCw className="h-8 w-8 animate-spin text-slate-200" />
+                            <p className="text-sm font-bold text-slate-300 uppercase tracking-widest">Actualizando registros...</p>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+
+                    {/* Mostrar Logs */}
                     {logs?.slice(0, 5).map((log) => { 
                       const dateObj = new Date(log.timestamp);
                       const isDateValid = isValid(dateObj);
 
                       return (
-                        <tr key={log.id} className="group hover:bg-slate-50 transition-colors">
+                        <tr key={log.id} className="group hover:bg-slate-50/50 transition-colors">
                             <td className="py-4 pl-4">
                                 <div className={`w-10 h-10 rounded-xl flex items-center justify-center 
-                                    ${log.action === 'INGRESO' ? 'bg-emerald-100 text-emerald-600' : 
+                                    ${log.action === 'INGRESO' || log.action === 'Creación' ? 'bg-emerald-100 text-emerald-600' : 
                                       log.action === 'SALIDA' ? 'bg-rose-100 text-rose-600' : 
-                                      log.action === 'ELIMINACIÓN' ? 'bg-red-100 text-red-600' : 'bg-amber-100 text-amber-600'}`}>
-                                    {log.action === 'INGRESO' && <ArrowDownLeft size={20} />}
+                                      log.action === 'ELIMINAR' || log.action === 'ELIMINACIÓN' ? 'bg-red-100 text-red-600' : 'bg-amber-100 text-amber-600'}`}>
+                                    {(log.action === 'INGRESO' || log.action === 'Creación') && <ArrowDownLeft size={20} />}
                                     {log.action === 'SALIDA' && <ArrowUpRight size={20} />}
-                                    {(log.action === 'ACTUALIZACIÓN' || log.action === 'ELIMINACIÓN') && <FileEdit size={20} />}
+                                    {(log.action === 'EDITAR' || log.action === 'ACTUALIZACIÓN' || log.action === 'ELIMINAR' || log.action === 'ELIMINACIÓN') && <FileEdit size={20} />}
                                 </div>
                             </td>
                             <td className="py-4">
-                                {/* ✅ MEJORA: Se asegura de mostrar el nombre de la bitácora */}
-                                <p className="font-bold text-[#1a2b4b] text-sm uppercase">{log.medicationName}</p>
-                                <p className="text-xs font-medium text-slate-500">
+                                <p className="font-bold text-[#1a2b4b] text-sm uppercase leading-tight">{log.medicationName || "Medicamento"}</p>
+                                <p className="text-[11px] font-medium text-slate-500 mt-0.5">
                                     {log.details}
                                 </p>
                             </td>
                             <td className="py-4">
-                                <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 text-xs font-bold">
+                                <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 text-[10px] font-black uppercase">
                                     {log.user?.username || 'Sistema'}
                                 </span>
                             </td>
                             <td className="py-4 text-right pr-4">
-                                <p className="text-sm font-bold text-slate-600">
+                                <p className="text-sm font-bold text-[#1a2b4b]">
                                   {isDateValid ? format(dateObj, 'dd MMM', { locale: es }) : '---'}
                                 </p>
-                                <p className="text-[10px] font-medium text-slate-400">
+                                <p className="text-[10px] font-bold text-slate-400">
                                   {isDateValid ? format(dateObj, 'HH:mm') : '--:--'}
                                 </p>
                             </td>
@@ -192,10 +214,11 @@ export default function Dashboard() {
                       );
                     })}
                     
-                    {(!logs || logs.length === 0) && (
+                    {/* Estado vacío */}
+                    {!isLoadingLogs && (!logs || logs.length === 0) && (
                       <tr>
-                        <td colSpan={4} className="py-10 text-center text-slate-400 font-bold italic">
-                          {isLoadingLogs ? 'Cargando bitácora...' : 'No se han registrado movimientos todavía.'}
+                        <td colSpan={4} className="py-20 text-center text-slate-400 font-bold italic">
+                          No se han detectado movimientos recientes en la sede.
                         </td>
                       </tr>
                     )}
