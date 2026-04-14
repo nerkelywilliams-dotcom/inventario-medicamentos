@@ -1,3 +1,5 @@
+"use client"
+
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 // ✅ CORRECCIÓN: Separamos las rutas de los esquemas de datos
 import { api, buildUrl } from "@shared/routes";
@@ -92,6 +94,93 @@ export function useCreateMedication() {
         throw new Error(error.message || "Failed to create medication");
       }
       return api.medications.create.responses[201].parse(await res.json());
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.medications.list.path] });
+      queryClient.invalidateQueries({ queryKey: ["/api/logs"] });
+    },
+  });
+}
+
+/**
+ * ✅ NUEVO: Hook para Importación Masiva
+ * Procesa un arreglo de medicamentos y los envía al backend.
+ */
+export function useBulkCreateMedications() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+  
+  return useMutation({
+    mutationFn: async (medications: any[]) => {
+      const headers: HeadersInit = {
+        "Content-Type": "application/json",
+      };
+      
+      if (user) {
+        headers["x-user"] = encodeUserHeader(user);
+      }
+
+      // Normalización de datos antes de enviar (Crucial para Excel/CSV)
+      const payload = medications.map(m => ({
+        ...m,
+        // Convertimos fechas de string a objeto Date
+        expirationDate: m.expirationDate ? new Date(m.expirationDate) : null,
+        // Aseguramos que las cantidades sean números
+        quantity: isNaN(Number(m.quantity)) ? 0 : Number(m.quantity),
+        // Normalizamos el booleano isPediatric
+        isPediatric: String(m.isPediatric).toUpperCase() === 'TRUE' || m.isPediatric === 'Sí' || m.isPediatric === true,
+        // El familyId debe ser número o null
+        familyId: m.familyId ? Number(m.familyId) : null
+      }));
+
+      const res = await fetch("/api/medications/bulk", { 
+        method: "POST",
+        headers,
+        body: JSON.stringify(payload),
+        credentials: "include",
+      });
+
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || "Error en la carga masiva de medicamentos");
+      }
+      return await res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.medications.list.path] });
+      queryClient.invalidateQueries({ queryKey: ["/api/logs"] });
+    },
+  });
+}
+
+/**
+ * ✅ NUEVO: Hook para Borrar Inventario
+ * Utilizado por el componente BorrarInventario para vaciar la base de datos.
+ */
+export function useClearInventory() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  return useMutation({
+    mutationFn: async () => {
+      const headers: HeadersInit = {
+        "Content-Type": "application/json",
+      };
+      
+      if (user) {
+        headers["x-user"] = encodeUserHeader(user);
+      }
+
+      const res = await fetch("/api/medications", {
+        method: "DELETE",
+        headers,
+        credentials: "include",
+      });
+
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || "No se pudo limpiar el inventario");
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.medications.list.path] });
