@@ -133,21 +133,29 @@ export function useBulkCreateMedications() {
         familyId: m.familyId ? Number(m.familyId) : null
       }));
 
-      const res = await fetch("/api/medications/bulk", { 
+      // ✅ CORRECCIÓN DE RUTA: Cambiamos /bulk por /import para coincidir con el backend
+      const res = await fetch("/api/medications/import", { 
         method: "POST",
         headers,
         body: JSON.stringify(payload),
         credentials: "include",
       });
 
+      // Manejo de errores para evitar el crash por HTML (Unexpected token <)
+      const contentType = res.headers.get("content-type");
       if (!res.ok) {
+        if (contentType && contentType.includes("text/html")) {
+          throw new Error("El servidor devolvió un error 404/500 (HTML). Verifica que la ruta /api/medications/import exista.");
+        }
         const error = await res.json();
         throw new Error(error.message || "Error en la carga masiva de medicamentos");
       }
+      
       return await res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.medications.list.path] });
+      queryClient.invalidateQueries({ queryKey: ["/api/medications"] });
       queryClient.invalidateQueries({ queryKey: ["/api/logs"] });
     },
   });
@@ -177,13 +185,18 @@ export function useClearInventory() {
         credentials: "include",
       });
 
+      const contentType = res.headers.get("content-type");
       if (!res.ok) {
+        if (contentType && contentType.includes("text/html")) {
+          throw new Error("No se pudo limpiar el inventario: Error de ruta (404/500).");
+        }
         const error = await res.json();
         throw new Error(error.message || "No se pudo limpiar el inventario");
       }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.medications.list.path] });
+      queryClient.invalidateQueries({ queryKey: ["/api/medications"] });
       queryClient.invalidateQueries({ queryKey: ["/api/logs"] });
     },
   });
