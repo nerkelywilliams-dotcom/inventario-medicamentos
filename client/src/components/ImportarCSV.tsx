@@ -2,12 +2,13 @@ import { useState } from "react";
 import { Button } from "./ui/button";
 import { Upload } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { queryClient } from "@/lib/queryClient";
+import { useBulkCreateMedications } from "@/hooks/use-medications"; // ✅ Importamos el nuevo hook
 import * as XLSX from "xlsx";
 
 export function ImportarCSV() {
   const { toast } = useToast();
   const [uploading, setUploading] = useState(false);
+  const { mutateAsync: bulkCreate } = useBulkCreateMedications(); // ✅ Usamos la mutación
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -30,55 +31,56 @@ export function ImportarCSV() {
 
           // Mapear y limpiar los datos para asegurar que coincidan con tu schema de Zod
           const formattedData = jsonData.map((row: any) => ({
-            name: row.name ? String(row.name).trim() : "",
-            presentation: row.presentation ? String(row.presentation).trim() : "",
-            quantity: parseInt(row.quantity) || 0,
-            expirationDate: row.expirationDate ? new Date(row.expirationDate).toISOString() : new Date().toISOString(),
-            dose: row.dose ? String(row.dose).trim() : "Ver empaque",
-            description: row.description || "",
-            mechanismOfAction: row.mechanismOfAction || "",
-            indications: row.indications || "",
-            posology: row.posology || "",
-            administrationRoute: row.administrationRoute || "",
-            contraindications: row.contraindications || "No especificadas",
-            interactions: row.interactions || "No especificadas",
-            isPediatric: row.isPediatric === "true" || row.isPediatric === true || row.isPediatric === 1,
+            name: row.name ? String(row.name).trim() : (row.Nombre || ""),
+            presentation: row.presentation ? String(row.presentation).trim() : (row.Presentación || ""),
+            quantity: parseInt(row.quantity || row.Cantidad) || 0,
+            expirationDate: row.expirationDate || row["Fecha de Vencimiento"] || row.Vencimiento || null,
+            dose: row.dose || row.Dosis || "Ver empaque",
+            description: row.description || row.Descripción || "",
+            mechanismOfAction: row.mechanismOfAction || row["Mecanismo de Acción"] || "",
+            indications: row.indications || row.Indicaciones || "",
+            posology: row.posology || row.Posología || "",
+            administrationRoute: row.administrationRoute || row["Vía de Administración"] || "",
+            contraindications: row.contraindications || row.Contraindicaciones || "No especificadas",
+            interactions: row.interactions || row.Interacciones || "No especificadas",
+            isPediatric: row.isPediatric || row.Pediátrico || false,
             familyId: row.familyId ? parseInt(row.familyId) : undefined,
           })).filter(item => item.name && item.presentation); // Ignorar filas vacías
 
           if (formattedData.length === 0) {
-            throw new Error("El archivo está vacío o las columnas no coinciden.");
+            throw new Error("El archivo está vacío o las columnas no coinciden con 'name' y 'presentation'.");
           }
 
           toast({ title: "Importando", description: `Enviando ${formattedData.length} medicamentos...` });
           
-          // Enviar los datos masivos al backend
-          const response = await fetch('/api/medications/import', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(formattedData)
+          // ✅ ENVIAR DATOS USANDO EL HOOK (Maneja auth y caché automáticamente)
+          await bulkCreate(formattedData);
+
+          toast({ 
+            title: "¡Éxito!", 
+            description: `${formattedData.length} medicamentos importados correctamente.` 
           });
-
-          if (!response.ok) {
-            const err = await response.json();
-            throw new Error(err.message || "Error al guardar en la base de datos");
-          }
-
-          // Refrescar la tabla del inventario
-          queryClient.invalidateQueries({ queryKey: ["/api/medications"] });
-          toast({ title: "¡Éxito!", description: `${formattedData.length} medicamentos importados correctamente.` });
           
         } catch (error: any) {
-          toast({ variant: "destructive", title: "Error en el archivo", description: error.message });
+          console.error("Error detallado:", error);
+          toast({ 
+            variant: "destructive", 
+            title: "Error en la importación", 
+            description: error.message || "Hubo un problema al procesar los datos." 
+          });
         } finally {
           setUploading(false);
-          event.target.value = ''; // Resetear el input para poder subir el mismo archivo de nuevo si falló
+          event.target.value = ''; // Resetear el input
         }
       };
       
       reader.readAsArrayBuffer(file);
     } catch (error: any) {
-      toast({ variant: "destructive", title: "Error", description: "No se pudo leer el archivo." });
+      toast({ 
+        variant: "destructive", 
+        title: "Error", 
+        description: "No se pudo leer el archivo." 
+      });
       setUploading(false);
       event.target.value = '';
     }
