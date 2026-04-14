@@ -101,22 +101,31 @@ export default function Inventory() {
     if (!medications) return;
     const data = medications.map((m: any) => {
       const date = new Date(m.expirationDate);
+      // Exportamos con los nombres de variables exactos del esquema para que funcione como plantilla de importación
       return {
-        Nombre: m.catalog?.name || "Sin nombre",
-        Dosis: m.dose,
-        Pediátrico: m.isPediatric ? "Sí" : "No",
-        Familia: m.family?.name || "No asignada",
-        Presentacion: m.presentation,
-        Cantidad: m.quantity,
-        Vencimiento: isValid(date) ? format(date, "yyyy-MM-dd") : "Fecha inválida",
-        Estado: m.quantity === 0 ? "Agotado" : m.quantity < 10 ? "Bajo Stock" : "Disponible"
+        name: m.catalog?.name || "",
+        dose: m.dose || "",
+        presentation: m.presentation || "",
+        quantity: m.quantity || 0,
+        expirationDate: isValid(date) ? format(date, "yyyy-MM-dd") : "",
+        isPediatric: m.isPediatric ? "TRUE" : "FALSE",
+        familyId: m.familyId || "",
+        description: m.catalog?.description || "",
+        actionMechanism: m.catalog?.actionMechanism || "",
+        indications: m.catalog?.indications || "",
+        posology: m.catalog?.posology || "",
+        contraindications: m.catalog?.contraindications || "",
+        interactions: m.catalog?.interactions || "",
+        // Campos puramente informativos (la importación debe ignorarlos)
+        _Familia_Visual: m.family?.name || "No asignada",
+        _Estado_Stock: m.quantity === 0 ? "Agotado" : m.quantity < 10 ? "Bajo Stock" : "Disponible"
       };
     });
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Inventario");
     XLSX.writeFile(wb, `Inventario_${format(new Date(), "yyyy-MM-dd")}.xlsx`);
-    toast({ title: "Exportación exitosa", description: "El archivo Excel se ha descargado." });
+    toast({ title: "Plantilla Exportada", description: "El archivo Excel descargado sirve como plantilla para importar." });
   };
 
   const handleDelete = async (id: number) => {
