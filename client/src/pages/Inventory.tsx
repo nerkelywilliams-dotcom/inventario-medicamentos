@@ -33,7 +33,7 @@ import { MedicationForm } from "@/components/MedicationForm";
 import { MedicationDetail } from "@/components/MedicationDetail";
 import { ExpiryBadge, StockBadge } from "@/components/StatusBadges";
 import { Search, Plus, FileDown, Eye, Pencil, Trash2, FilterX, Baby, Loader2, Upload } from "lucide-react";
-import { format, isValid, parse } from "date-fns";
+import { format, isValid } from "date-fns";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { useSearch, Link } from "wouter";
@@ -107,7 +107,7 @@ export default function Inventory() {
       quantity: m.quantity || 0,
       expirationDate: m.expirationDate ? format(new Date(m.expirationDate), "yyyy-MM-dd") : "",
       isPediatric: m.isPediatric ? "TRUE" : "FALSE",
-      familyId: m.familyId || "",
+      familyId: m.familyId || "", // Es mejor exportar el ID para la re-importación
       description: m.catalog?.description || "",
       actionMechanism: m.catalog?.actionMechanism || "",
       indications: m.catalog?.indications || "",
@@ -118,8 +118,7 @@ export default function Inventory() {
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Inventario");
-    XLSX.writeFile(wb, `Plantilla_Sede_${user?.inventoryLocation}_${format(new Date(), "yyyy-MM-dd")}.xlsx`);
-    toast({ title: "Plantilla descargada", description: "Usa este archivo para asegurar que los nombres de las columnas sean correctos." });
+    XLSX.writeFile(wb, `Plantilla_Medistock_${user?.inventoryLocation}.xlsx`);
   };
 
   const handleImportClick = () => fileInputRef.current?.click();
@@ -134,51 +133,43 @@ export default function Inventory() {
         const bstr = evt.target?.result;
         const wb = XLSX.read(bstr, { type: "binary", cellDates: true });
         const wsname = wb.SheetNames[0];
-        const ws = wb.Sheets[wsname];
-        const rawData: any[] = XLSX.utils.sheet_to_json(ws);
+        const rawData: any[] = XLSX.utils.sheet_to_json(wb.Sheets[wsname]);
 
-        if (rawData.length === 0) {
-          toast({ variant: "destructive", title: "Error", description: "El archivo no contiene datos." });
-          return;
-        }
+        // Mapeo de nombres de familia a IDs para evitar errores de validación
+        const familyMap = new Map(families.map((f: any) => [f.name.toLowerCase().trim(), f.id]));
 
-        // ✅ NORMALIZACIÓN DE DATOS ANTES DE ENVIAR
-        const formattedData = rawData.map((row: any) => ({
-          name: String(row.name || "").trim(),
-          dose: String(row.dose || "").trim(),
-          presentation: String(row.presentation || "").trim(),
-          quantity: parseInt(row.quantity) || 0,
-          // Manejo de fecha (Excel a veces envía objetos Date o Strings)
-          expirationDate: row.expirationDate instanceof Date 
-            ? row.expirationDate.toISOString() 
-            : row.expirationDate,
-          isPediatric: String(row.isPediatric).toUpperCase() === "TRUE",
-          familyId: row.familyId ? parseInt(row.familyId) : null,
-          description: row.description || "",
-          actionMechanism: row.actionMechanism || "",
-          indications: row.indications || "",
-          posology: row.posology || "",
-          contraindications: row.contraindications || "",
-          interactions: row.interactions || ""
-        }));
+        const formattedData = rawData.map((row: any) => {
+          // Intentar obtener ID de familia si el usuario escribió el nombre
+          let fId = row.familyId;
+          if (typeof row.familyId === 'string' && isNaN(Number(row.familyId))) {
+            fId = familyMap.get(row.familyId.toLowerCase().trim()) || null;
+          }
+
+          return {
+            name: String(row.name || "").trim(),
+            dose: String(row.dose || "").trim(),
+            presentation: String(row.presentation || "").trim(),
+            quantity: parseInt(row.quantity) || 0,
+            expirationDate: row.expirationDate instanceof Date 
+              ? row.expirationDate.toISOString() 
+              : new Date(row.expirationDate).toISOString(),
+            isPediatric: String(row.isPediatric).toUpperCase() === "TRUE",
+            familyId: fId ? parseInt(fId) : null,
+            description: String(row.description || ""),
+            actionMechanism: String(row.actionMechanism || ""),
+            indications: String(row.indications || ""),
+            posology: String(row.posology || ""),
+            contraindications: String(row.contraindications || ""),
+            interactions: String(row.interactions || "")
+          };
+        });
 
         await bulkCreateMutation.mutateAsync(formattedData);
-        
-        if (user) {
-          await createLog.mutateAsync({
-            action: "CREAR",
-            details: `Importación masiva exitosa: ${formattedData.length} registros.`,
-            userId: user.id
-          });
-        }
-        toast({ title: "Éxito", description: `Se importaron ${formattedData.length} medicamentos correctamente.` });
+        toast({ title: "Importación completada", description: `Se cargaron ${formattedData.length} registros.` });
+        if (user) await createLog.mutateAsync({ action: "CREAR", details: `Importación masiva: ${formattedData.length} ítems.`, userId: user.id });
       } catch (error: any) {
-        console.error("Error en importación:", error);
-        toast({ 
-          variant: "destructive", 
-          title: "Fallo en la importación", 
-          description: error.message || "Asegúrate de que el formato de los datos sea correcto." 
-        });
+        console.error("Error detallado:", error);
+        toast({ variant: "destructive", title: "Error de validación", description: "Revisa que los campos obligatorios (nombre, dosis, cantidad) no estén vacíos." });
       } finally {
         if (fileInputRef.current) fileInputRef.current.value = "";
       }
@@ -196,7 +187,7 @@ export default function Inventory() {
 
   const handleClearAll = async () => {
     await clearInventoryMutation.mutateAsync();
-    if (user) await createLog.mutateAsync({ action: "ELIMINAR", details: "Reinicio de inventario", userId: user.id });
+    if (user) await createLog.mutateAsync({ action: "ELIMINAR", details: "Vaciado de inventario", userId: user.id });
     setIsClearDialogOpen(false);
   };
 
@@ -219,7 +210,7 @@ export default function Inventory() {
             </Button>
           )}
           
-          <Button variant="outline" onClick={handleExport} className="gap-2 border-primary/20 hover:bg-primary/5">
+          <Button variant="outline" onClick={handleExport} className="gap-2 border-primary/20">
             <FileDown className="h-4 w-4" /> Exportar/Plantilla
           </Button>
 
@@ -242,12 +233,12 @@ export default function Inventory() {
                 </AlertDialogTrigger>
                 <AlertDialogContent>
                   <AlertDialogHeader>
-                    <AlertDialogTitle className="text-destructive">¿Borrar todo el inventario?</AlertDialogTitle>
-                    <AlertDialogDescription>Esta acción es permanente y eliminará todos los registros de esta sede.</AlertDialogDescription>
+                    <AlertDialogTitle className="text-destructive">¿Estás absolutamente segura?</AlertDialogTitle>
+                    <AlertDialogDescription>Esta acción no se puede deshacer. Se eliminarán permanentemente todos los medicamentos de esta sede.</AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
                     <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleClearAll} className="bg-destructive hover:bg-destructive/90">Confirmar</AlertDialogAction>
+                    <AlertDialogAction onClick={handleClearAll} className="bg-destructive hover:bg-destructive/90">Sí, borrar todo</AlertDialogAction>
                   </AlertDialogFooter>
                 </AlertDialogContent>
               </AlertDialog>
@@ -257,7 +248,7 @@ export default function Inventory() {
                   <Button className="gap-2 shadow-lg bg-primary hover:bg-primary/90"><Plus className="h-4 w-4" /> Nuevo</Button>
                 </DialogTrigger>
                 <DialogContent className="max-w-4xl max-h-[95vh] overflow-y-auto">
-                  <DialogHeader><DialogTitle className="text-2xl font-bold text-primary">Registrar Medicamento</DialogTitle></DialogHeader>
+                  <DialogHeader><DialogTitle className="text-2xl font-bold text-primary">Registrar Nuevo</DialogTitle></DialogHeader>
                   <MedicationForm 
                     submitLabel="Registrar" 
                     isLoading={createMutation.isPending} 
@@ -275,11 +266,11 @@ export default function Inventory() {
         </div>
       </div>
 
-      <div className="flex flex-col md:flex-row gap-4 bg-card p-4 rounded-xl border border-border shadow-sm">
+      <div className="flex flex-col md:flex-row gap-4 bg-card p-4 rounded-xl border shadow-sm">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input 
-            placeholder="Buscar en el inventario..." 
+            placeholder="Buscar por nombre, principio o escriba 'pediatrico'..." 
             className="pl-9 border-none bg-muted/50"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -287,21 +278,16 @@ export default function Inventory() {
         </div>
         <div className="w-full md:w-64">
           <Select value={familyFilter} onValueChange={setFamilyFilter}>
-            <SelectTrigger className="border-none bg-muted/50"><SelectValue placeholder="Familia" /></SelectTrigger>
+            <SelectTrigger className="border-none bg-muted/50"><SelectValue placeholder="Todas las Familias" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todas las Familias</SelectItem>
               {families.map((f: any) => (<SelectItem key={f.id} value={f.id.toString()}>{f.name}</SelectItem>))}
             </SelectContent>
           </Select>
         </div>
-        {(search || familyFilter !== "all" || isUrlPediatricFilter) && (
-          <Button variant="ghost" size="icon" onClick={() => { setSearch(""); setFamilyFilter("all"); }}>
-            <FilterX className="h-4 w-4 text-muted-foreground" />
-          </Button>
-        )}
       </div>
 
-      <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
+      <div className="bg-card rounded-xl border shadow-sm overflow-hidden">
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/30">
@@ -360,7 +346,7 @@ export default function Inventory() {
                 onSubmit={async (data: any) => {
                   const fmt = { ...data, familyId: data.familyId ? parseInt(data.familyId) : undefined, quantity: parseInt(data.quantity) };
                   await updateMutation.mutateAsync({ id: editingId, ...fmt });
-                  if (user) await createLog.mutateAsync({ action: "EDITAR", details: `Actualizado: ${data.name}`, userId: user.id });
+                  if (user) await createLog.mutateAsync({ action: "EDITAR", details: `Editado: ${data.name}`, userId: user.id });
                   setEditingId(null);
                 }}
               />
