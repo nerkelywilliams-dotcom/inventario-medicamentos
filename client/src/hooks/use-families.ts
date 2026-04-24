@@ -56,6 +56,8 @@ export function useFamilies() {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/families"] });
+      // ✅ Agregado: Actualizar inventario si el nombre de la familia cambia
+      queryClient.invalidateQueries({ queryKey: ["/api/medications"] });
     },
   });
 
@@ -65,6 +67,8 @@ export function useFamilies() {
       apiRequest(`/api/families/${id}`, { method: "DELETE" }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/families"] });
+      // ✅ Agregado: Actualizar inventario si se elimina una familia
+      queryClient.invalidateQueries({ queryKey: ["/api/medications"] });
     },
   });
 
