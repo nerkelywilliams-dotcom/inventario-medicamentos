@@ -41,8 +41,8 @@ export default function FamiliesPage() {
   const [sortBy, setSortBy] = useState("newest");
   const [isOpen, setIsOpen] = useState(false);
 
-  // 3. Extracción segura de datos (Ajustado según tus errores de TS en la captura)
-  // Usamos (hook as any).data porque el IDE detecta que es un UseQueryResult
+  // 3. Extracción segura de datos
+  // Usamos el casting para evitar los errores de TS que tenías en tu captura
   const families = (familiesHook as any)?.data || (familiesHook as any)?.families || [];
   const isLoadingFamilies = familiesHook?.isLoading;
   const createFamily = familiesHook?.createFamily; 
@@ -65,8 +65,8 @@ export default function FamiliesPage() {
       if (sortBy === "az") return (a.name || "").localeCompare(b.name || "");
       if (sortBy === "za") return (b.name || "").localeCompare(a.name || "");
       if (sortBy === "most_used") {
-        const countA = medications.filter((m: any) => m.familyId === a.id).length;
-        const countB = medications.filter((m: any) => m.familyId === b.id).length;
+        const countA = medications.filter((m: any) => Number(m.familyId) === Number(a.id)).length;
+        const countB = medications.filter((m: any) => Number(m.familyId) === Number(b.id)).length;
         return countB - countA;
       }
       return (Number(b.id) || 0) - (Number(a.id) || 0);
@@ -107,34 +107,38 @@ export default function FamiliesPage() {
   const handleUpdateFamily = async (id: number, data: any) => {
     try {
       if (updateFamily?.mutateAsync) {
-        await updateFamily.mutateAsync({ id, ...data });
-        toast({ title: "Actualizado", description: "Cambios guardados." });
+        await updateFamily.mutateAsync({ id: Number(id), ...data });
+        toast({ title: "Actualizado", description: "Cambios guardados con éxito." });
       }
     } catch (e) {
-      toast({ title: "Error", description: "No se pudo actualizar.", variant: "destructive" });
+      console.error("Error al actualizar:", e);
+      toast({ title: "Error", description: "No se pudo actualizar la familia.", variant: "destructive" });
     }
   };
 
   // 5.2 Manejador de Eliminación
   const handleDeleteFamily = async (id: number) => {
-    const hasMedications = medications.some((m: any) => m.familyId === id);
+    // Verificamos si hay medicamentos asociados antes de intentar borrar
+    const hasMedications = medications.some((m: any) => Number(m.familyId) === Number(id));
+    
     if (hasMedications) {
       toast({
-        title: "No se puede eliminar",
-        description: "Esta familia tiene medicamentos asociados.",
+        title: "Operación no permitida",
+        description: "No puedes eliminar esta familia porque tiene medicamentos vinculados en el inventario.",
         variant: "destructive",
       });
       return;
     }
 
-    if (window.confirm("¿Estás seguro de eliminar este grupo terapéutico?")) {
+    if (window.confirm("¿Estás seguro de que deseas eliminar este grupo terapéutico? Esta acción no se puede deshacer.")) {
       try {
         if (deleteFamily?.mutateAsync) {
-          await deleteFamily.mutateAsync(id);
-          toast({ title: "Eliminado", description: "Familia eliminada con éxito." });
+          await deleteFamily.mutateAsync(Number(id));
+          toast({ title: "Eliminado", description: "La familia ha sido removida del sistema." });
         }
       } catch (e) {
-        toast({ title: "Error", description: "No se pudo eliminar.", variant: "destructive" });
+        console.error("Error al eliminar:", e);
+        toast({ title: "Error", description: "Hubo un problema al intentar eliminar.", variant: "destructive" });
       }
     }
   };
@@ -144,7 +148,7 @@ export default function FamiliesPage() {
     return (
       <div className="flex flex-col items-center justify-center min-h-[400px]">
         <Loader2 className="h-10 w-10 animate-spin text-primary/50" />
-        <p className="text-slate-400 mt-4 font-medium">Sincronizando inventario...</p>
+        <p className="text-slate-400 mt-4 font-medium">Sincronizando grupos terapéuticos...</p>
       </div>
     );
   }
@@ -159,7 +163,7 @@ export default function FamiliesPage() {
 
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
           <DialogTrigger asChild>
-            <Button className="font-bold shadow-lg">
+            <Button className="font-bold shadow-lg bg-[#1a2b4b] hover:bg-[#2a3b5b]">
               <Plus className="mr-2 h-5 w-5" /> Nueva Familia
             </Button>
           </DialogTrigger>
@@ -175,6 +179,7 @@ export default function FamiliesPage() {
         </Dialog>
       </div>
 
+      {/* Barra de Búsqueda y Filtros */}
       <div className="flex flex-col md:flex-row gap-4 bg-white p-4 rounded-xl shadow-sm border border-slate-100">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
@@ -199,6 +204,7 @@ export default function FamiliesPage() {
         </Select>
       </div>
 
+      {/* Grid de Tarjetas */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredAndSortedFamilies.map((family: any) => (
           <FamilyCard 
@@ -210,10 +216,11 @@ export default function FamiliesPage() {
         ))}
       </div>
 
+      {/* Empty State */}
       {filteredAndSortedFamilies.length === 0 && (
         <div className="text-center py-20 bg-slate-50 rounded-2xl border-2 border-dashed">
           <AlertCircle className="mx-auto h-12 w-12 text-slate-300" />
-          <p className="text-slate-500 mt-2 font-medium">No se encontraron familias que coincidan.</p>
+          <p className="text-slate-500 mt-2 font-medium">No se encontraron familias que coincidan con tu búsqueda.</p>
         </div>
       )}
     </div>
