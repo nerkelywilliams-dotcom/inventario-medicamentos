@@ -1,31 +1,48 @@
+import { useEffect } from "react";
 import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod"; // Agregado para validación
-import { insertFamilySchema } from "@shared/schema"; // Agregado para usar el esquema del servidor
+import { zodResolver } from "@hookform/resolvers/zod";
+import { insertFamilySchema } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Loader2 } from "lucide-react";
 
-export function FamilyForm({ onSubmit, isLoading }: { onSubmit: (data: any) => void; isLoading: boolean }) {
-  // Configuración del formulario con validación automática de Zod
+interface FamilyFormProps {
+  onSubmit: (data: any) => void;
+  isLoading: boolean;
+  initialData?: any; // Prop agregada para recibir los datos al editar
+}
+
+export function FamilyForm({ onSubmit, isLoading, initialData }: FamilyFormProps) {
+  // Configuración del formulario
   const form = useForm({
-    resolver: zodResolver(insertFamilySchema), // Vinculamos las reglas de la base de datos
-    defaultValues: {
+    resolver: zodResolver(insertFamilySchema),
+    defaultValues: initialData || {
       name: "",
       description: "",
     },
   });
 
-  // Función intermedia para limpiar el formulario tras un envío exitoso
+  // EFECTO CLAVE: Sincroniza los datos cuando el componente recibe initialData
+  // Esto hace que los campos dejen de aparecer en blanco al editar
+  useEffect(() => {
+    if (initialData) {
+      form.reset(initialData);
+    }
+  }, [initialData, form]);
+
+  // Función intermedia para manejar el envío
   const handleSubmit = async (data: any) => {
     await onSubmit(data);
-    form.reset(); // Limpia los campos después de guardar
+    // Solo reseteamos a vacío si no estamos editando (opcional, según prefieras)
+    if (!initialData) {
+      form.reset();
+    }
   };
 
   return (
     <Form {...form}>
-      {/* Usamos nuestra función handleSubmit local */}
       <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4 pt-4">
         <FormField
           control={form.control}
@@ -36,7 +53,7 @@ export function FamilyForm({ onSubmit, isLoading }: { onSubmit: (data: any) => v
               <FormControl>
                 <Input placeholder="Ej. Antibióticos, Analgésicos..." {...field} />
               </FormControl>
-              <FormMessage /> {/* Esto ahora mostrará errores de Zod automáticamente */}
+              <FormMessage />
             </FormItem>
           )}
         />
@@ -51,7 +68,7 @@ export function FamilyForm({ onSubmit, isLoading }: { onSubmit: (data: any) => v
                   placeholder="Describe el uso o grupo terapéutico..." 
                   className="resize-none" 
                   {...field} 
-                  value={field.value || ""} // Evita errores de componentes controlados
+                  value={field.value || ""} 
                 />
               </FormControl>
               <FormMessage />
@@ -65,7 +82,7 @@ export function FamilyForm({ onSubmit, isLoading }: { onSubmit: (data: any) => v
               Guardando...
             </>
           ) : (
-            "Guardar Familia"
+            initialData ? "Guardar Cambios" : "Guardar Familia"
           )}
         </Button>
       </form>
