@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef } from "react"; // ✅ Agregado useRef
+import { useState, useRef } from "react";
 import * as XLSX from "xlsx";
 import { 
   useMedications, 
@@ -8,7 +8,7 @@ import {
   useUpdateMedication, 
   useDeleteMedication,
   useClearInventory,
-  useBulkCreateMedications // ✅ Hook de importación masiva
+  useBulkCreateMedications 
 } from "@/hooks/use-medications";
 import { useFamilies } from "@/hooks/use-families";
 import { useAuth } from "@/context/AuthContext";
@@ -33,7 +33,7 @@ import { MedicationForm } from "@/components/MedicationForm";
 import { MedicationDetail } from "@/components/MedicationDetail";
 import { ExpiryBadge, StockBadge } from "@/components/StatusBadges";
 import { Search, Plus, FileDown, Eye, Pencil, Trash2, FilterX, Baby, Loader2, Upload } from "lucide-react";
-import { format, isValid } from "date-fns";
+import { format, isValid, parse } from "date-fns";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { useSearch, Link } from "wouter";
@@ -46,7 +46,7 @@ export default function Inventory() {
   const [isClearDialogOpen, setIsClearDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [detailId, setDetailId] = useState<number | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null); // ✅ Ref para el input de archivo
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const searchString = useSearch();
   const params = new URLSearchParams(searchString);
@@ -66,7 +66,7 @@ export default function Inventory() {
   const updateMutation = useUpdateMedication();
   const deleteMutation = useDeleteMedication();
   const clearInventoryMutation = useClearInventory();
-  const bulkCreateMutation = useBulkCreateMedications(); // ✅ Hook de importación
+  const bulkCreateMutation = useBulkCreateMedications();
   const createLog = useCreateLog();
   const { toast } = useToast();
 
@@ -87,54 +87,41 @@ export default function Inventory() {
   } : null;
 
   const filteredMedications = medications?.filter((med: any) => {
-    const normalize = (str: string) => 
-      str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    const normalize = (str: string) => str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
     const term = normalize(search);
     const name = normalize(med.catalog?.name || "");
     const presentation = normalize(med.presentation || "");
 
-    if (isUrlPediatricFilter) {
-      const matchesSearch = name.includes(term) || presentation.includes(term);
-      return med.isPediatric === true && matchesSearch;
-    }
-
-    const isSearchingPediatric = term.startsWith("ped") || 
-                                term.includes("nino") || 
-                                term.includes("infantil") ||
-                                term.includes("bebe");
-
+    if (isUrlPediatricFilter) return med.isPediatric === true && (name.includes(term) || presentation.includes(term));
+    const isSearchingPediatric = term.startsWith("ped") || term.includes("nino") || term.includes("infantil") || term.includes("bebe");
     if (isSearchingPediatric) return med.isPediatric === true;
     return name.includes(term) || presentation.includes(term);
   });
 
   const handleExport = () => {
     if (!medications) return;
-    const data = medications.map((m: any) => {
-      const date = new Date(m.expirationDate);
-      return {
-        name: m.catalog?.name || "",
-        dose: m.dose || "",
-        presentation: m.presentation || "",
-        quantity: m.quantity || 0,
-        expirationDate: isValid(date) ? format(date, "yyyy-MM-dd") : "",
-        isPediatric: m.isPediatric ? "TRUE" : "FALSE",
-        familyId: m.familyId || "",
-        description: m.catalog?.description || "",
-        actionMechanism: m.catalog?.actionMechanism || "",
-        indications: m.catalog?.indications || "",
-        posology: m.catalog?.posology || "",
-        contraindications: m.catalog?.contraindications || "",
-        interactions: m.catalog?.interactions || ""
-      };
-    });
+    const data = medications.map((m: any) => ({
+      name: m.catalog?.name || "",
+      dose: m.dose || "",
+      presentation: m.presentation || "",
+      quantity: m.quantity || 0,
+      expirationDate: m.expirationDate ? format(new Date(m.expirationDate), "yyyy-MM-dd") : "",
+      isPediatric: m.isPediatric ? "TRUE" : "FALSE",
+      familyId: m.familyId || "",
+      description: m.catalog?.description || "",
+      actionMechanism: m.catalog?.actionMechanism || "",
+      indications: m.catalog?.indications || "",
+      posology: m.catalog?.posology || "",
+      contraindications: m.catalog?.contraindications || "",
+      interactions: m.catalog?.interactions || ""
+    }));
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Inventario");
-    XLSX.writeFile(wb, `Plantilla_Inventario_${format(new Date(), "yyyy-MM-dd")}.xlsx`);
-    toast({ title: "Plantilla Exportada", description: "El archivo sirve como base para importar." });
+    XLSX.writeFile(wb, `Plantilla_Sede_${user?.inventoryLocation}_${format(new Date(), "yyyy-MM-dd")}.xlsx`);
+    toast({ title: "Plantilla descargada", description: "Usa este archivo para asegurar que los nombres de las columnas sean correctos." });
   };
 
-  // ✅ Nueva lógica de Importación Integrada
   const handleImportClick = () => fileInputRef.current?.click();
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -145,28 +132,53 @@ export default function Inventory() {
     reader.onload = async (evt) => {
       try {
         const bstr = evt.target?.result;
-        const wb = XLSX.read(bstr, { type: "binary" });
+        const wb = XLSX.read(bstr, { type: "binary", cellDates: true });
         const wsname = wb.SheetNames[0];
         const ws = wb.Sheets[wsname];
-        const data = XLSX.utils.sheet_to_json(ws);
+        const rawData: any[] = XLSX.utils.sheet_to_json(ws);
 
-        if (data.length === 0) {
-          toast({ variant: "destructive", title: "Archivo vacío", description: "No se encontraron datos para importar." });
+        if (rawData.length === 0) {
+          toast({ variant: "destructive", title: "Error", description: "El archivo no contiene datos." });
           return;
         }
 
-        await bulkCreateMutation.mutateAsync(data);
+        // ✅ NORMALIZACIÓN DE DATOS ANTES DE ENVIAR
+        const formattedData = rawData.map((row: any) => ({
+          name: String(row.name || "").trim(),
+          dose: String(row.dose || "").trim(),
+          presentation: String(row.presentation || "").trim(),
+          quantity: parseInt(row.quantity) || 0,
+          // Manejo de fecha (Excel a veces envía objetos Date o Strings)
+          expirationDate: row.expirationDate instanceof Date 
+            ? row.expirationDate.toISOString() 
+            : row.expirationDate,
+          isPediatric: String(row.isPediatric).toUpperCase() === "TRUE",
+          familyId: row.familyId ? parseInt(row.familyId) : null,
+          description: row.description || "",
+          actionMechanism: row.actionMechanism || "",
+          indications: row.indications || "",
+          posology: row.posology || "",
+          contraindications: row.contraindications || "",
+          interactions: row.interactions || ""
+        }));
+
+        await bulkCreateMutation.mutateAsync(formattedData);
         
         if (user) {
           await createLog.mutateAsync({
             action: "CREAR",
-            details: `Importación masiva: ${data.length} registros nuevos en sede ${user.inventoryLocation}.`,
+            details: `Importación masiva exitosa: ${formattedData.length} registros.`,
             userId: user.id
           });
         }
-        toast({ title: "Importación exitosa", description: `Se han procesado ${data.length} medicamentos.` });
+        toast({ title: "Éxito", description: `Se importaron ${formattedData.length} medicamentos correctamente.` });
       } catch (error: any) {
-        toast({ variant: "destructive", title: "Error de importación", description: "Verifica que el formato del Excel sea correcto." });
+        console.error("Error en importación:", error);
+        toast({ 
+          variant: "destructive", 
+          title: "Fallo en la importación", 
+          description: error.message || "Asegúrate de que el formato de los datos sea correcto." 
+        });
       } finally {
         if (fileInputRef.current) fileInputRef.current.value = "";
       }
@@ -176,7 +188,7 @@ export default function Inventory() {
 
   const handleDelete = async (id: number) => {
     const med = medications?.find((m: any) => m.id === id);
-    if (window.confirm(`¿Estás seguro de eliminar ${med?.catalog?.name}?`)) {
+    if (window.confirm(`¿Eliminar ${med?.catalog?.name}?`)) {
       await deleteMutation.mutateAsync(id);
       if (user) await createLog.mutateAsync({ action: "ELIMINAR", details: `Eliminado: ${med?.catalog?.name}`, userId: user.id });
     }
@@ -184,7 +196,7 @@ export default function Inventory() {
 
   const handleClearAll = async () => {
     await clearInventoryMutation.mutateAsync();
-    if (user) await createLog.mutateAsync({ action: "ELIMINAR", details: `Vaciado total de inventario en sede ${user.inventoryLocation}`, userId: user.id });
+    if (user) await createLog.mutateAsync({ action: "ELIMINAR", details: "Reinicio de inventario", userId: user.id });
     setIsClearDialogOpen(false);
   };
 
@@ -213,7 +225,6 @@ export default function Inventory() {
 
           {isAdmin && (
             <>
-              {/* ✅ Botón de Importar (Nuevo sistema) */}
               <input type="file" ref={fileInputRef} onChange={handleFileChange} accept=".xlsx,.xls,.csv" className="hidden" />
               <Button 
                 variant="outline" 
@@ -222,44 +233,38 @@ export default function Inventory() {
                 disabled={bulkCreateMutation.isPending}
               >
                 {bulkCreateMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-                Importar Datos
+                Importar Excel
               </Button>
 
               <AlertDialog open={isClearDialogOpen} onOpenChange={setIsClearDialogOpen}>
                 <AlertDialogTrigger asChild>
-                  <Button variant="destructive" className="gap-2 font-bold shadow-md"><Trash2 className="h-4 w-4" /> Vaciar Inventario</Button>
+                  <Button variant="destructive" className="gap-2 font-bold"><Trash2 className="h-4 w-4" /> Vaciar Inventario</Button>
                 </AlertDialogTrigger>
                 <AlertDialogContent>
                   <AlertDialogHeader>
-                    <AlertDialogTitle className="text-destructive">¿Estás absolutamente segura?</AlertDialogTitle>
-                    <AlertDialogDescription>Esta acción eliminará TODO el inventario de esta sede. Esta operación no se puede deshacer.</AlertDialogDescription>
+                    <AlertDialogTitle className="text-destructive">¿Borrar todo el inventario?</AlertDialogTitle>
+                    <AlertDialogDescription>Esta acción es permanente y eliminará todos los registros de esta sede.</AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
                     <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                    <AlertDialogAction 
-                      onClick={handleClearAll} 
-                      className="bg-destructive hover:bg-destructive/90"
-                      disabled={clearInventoryMutation.isPending}
-                    >
-                      {clearInventoryMutation.isPending ? "Borrando..." : "Sí, vaciar todo"}
-                    </AlertDialogAction>
+                    <AlertDialogAction onClick={handleClearAll} className="bg-destructive hover:bg-destructive/90">Confirmar</AlertDialogAction>
                   </AlertDialogFooter>
                 </AlertDialogContent>
               </AlertDialog>
 
               <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
                 <DialogTrigger asChild>
-                  <Button className="gap-2 shadow-lg bg-primary hover:bg-primary/90"><Plus className="h-4 w-4" /> Nuevo Medicamento</Button>
+                  <Button className="gap-2 shadow-lg bg-primary hover:bg-primary/90"><Plus className="h-4 w-4" /> Nuevo</Button>
                 </DialogTrigger>
                 <DialogContent className="max-w-4xl max-h-[95vh] overflow-y-auto">
-                  <DialogHeader><DialogTitle className="text-2xl font-bold text-primary">Registrar Nuevo Ingreso</DialogTitle></DialogHeader>
+                  <DialogHeader><DialogTitle className="text-2xl font-bold text-primary">Registrar Medicamento</DialogTitle></DialogHeader>
                   <MedicationForm 
                     submitLabel="Registrar" 
                     isLoading={createMutation.isPending} 
                     families={families}
                     onSubmit={async (data) => {
                       await createMutation.mutateAsync(data);
-                      if (user) await createLog.mutateAsync({ action: "CREAR", details: `Registrado: ${data.name}`, userId: user.id });
+                      if (user) await createLog.mutateAsync({ action: "CREAR", details: `Nuevo: ${data.name}`, userId: user.id });
                       setIsCreateOpen(false);
                     }}
                   />
@@ -274,7 +279,7 @@ export default function Inventory() {
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input 
-            placeholder={isUrlPediatricFilter ? "Buscar en pediátricos..." : "Buscar medicamento..."} 
+            placeholder="Buscar en el inventario..." 
             className="pl-9 border-none bg-muted/50"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -282,7 +287,7 @@ export default function Inventory() {
         </div>
         <div className="w-full md:w-64">
           <Select value={familyFilter} onValueChange={setFamilyFilter}>
-            <SelectTrigger className="border-none bg-muted/50"><SelectValue placeholder="Filtrar por familia" /></SelectTrigger>
+            <SelectTrigger className="border-none bg-muted/50"><SelectValue placeholder="Familia" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todas las Familias</SelectItem>
               {families.map((f: any) => (<SelectItem key={f.id} value={f.id.toString()}>{f.name}</SelectItem>))}
@@ -313,7 +318,7 @@ export default function Inventory() {
                 <TableRow key={i}><TableCell colSpan={5}><Skeleton className="h-10 w-full" /></TableCell></TableRow>
               ))
             ) : filteredMedications?.length === 0 ? (
-              <TableRow><TableCell colSpan={5} className="h-48 text-center text-muted-foreground">No hay registros.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={5} className="h-48 text-center text-muted-foreground">Sin resultados.</TableCell></TableRow>
             ) : (
               filteredMedications.map((med: any) => (
                 <TableRow key={med.id} className={`group transition-colors hover:bg-primary/5 ${med.isPediatric ? "bg-sky-50/40" : ""}`}>
@@ -351,11 +356,11 @@ export default function Inventory() {
                 families={families}
                 defaultValues={formDefaultValues}
                 isLoading={updateMutation.isPending}
-                submitLabel="Guardar Cambios"
+                submitLabel="Guardar"
                 onSubmit={async (data: any) => {
                   const fmt = { ...data, familyId: data.familyId ? parseInt(data.familyId) : undefined, quantity: parseInt(data.quantity) };
                   await updateMutation.mutateAsync({ id: editingId, ...fmt });
-                  if (user) await createLog.mutateAsync({ action: "EDITAR", details: `Editado: ${data.name}`, userId: user.id });
+                  if (user) await createLog.mutateAsync({ action: "EDITAR", details: `Actualizado: ${data.name}`, userId: user.id });
                   setEditingId(null);
                 }}
               />
