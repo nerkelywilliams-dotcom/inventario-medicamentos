@@ -2,7 +2,13 @@
 
 import { useState } from "react";
 import * as XLSX from "xlsx";
-import { useMedications, useCreateMedication, useUpdateMedication, useDeleteMedication } from "@/hooks/use-medications";
+import { 
+  useMedications, 
+  useCreateMedication, 
+  useUpdateMedication, 
+  useDeleteMedication,
+  useClearInventory // ✅ Agregado
+} from "@/hooks/use-medications";
 import { useFamilies } from "@/hooks/use-families";
 import { useAuth } from "@/context/AuthContext";
 import { useCreateLog } from "@/hooks/use-logs";
@@ -11,12 +17,23 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+// ✅ Agregados para la confirmación de borrado
+import { 
+  AlertDialog, 
+  AlertDialogAction, 
+  AlertDialogCancel, 
+  AlertDialogContent, 
+  AlertDialogDescription, 
+  AlertDialogFooter, 
+  AlertDialogHeader, 
+  AlertDialogTitle, 
+  AlertDialogTrigger 
+} from "@/components/ui/alert-dialog";
 import { MedicationForm } from "@/components/MedicationForm";
 import { MedicationDetail } from "@/components/MedicationDetail";
 import { ImportarCSV } from "@/components/ImportarCSV";
-import { BorrarInventario } from "@/components/BorrarInventario";
 import { ExpiryBadge, StockBadge } from "@/components/StatusBadges";
-import { Search, Plus, FileDown, Eye, Pencil, Trash2, FilterX, Tag, Baby } from "lucide-react";
+import { Search, Plus, FileDown, Eye, Pencil, Trash2, FilterX, Tag, Baby, Loader2 } from "lucide-react";
 import { format, isValid } from "date-fns";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
@@ -28,6 +45,7 @@ export default function Inventory() {
   const [search, setSearch] = useState("");
   const [familyFilter, setFamilyFilter] = useState<string>("all");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [isClearDialogOpen, setIsClearDialogOpen] = useState(false); // ✅ Estado para el modal de borrado
   const [editingId, setEditingId] = useState<number | null>(null);
   const [detailId, setDetailId] = useState<number | null>(null);
 
@@ -50,13 +68,13 @@ export default function Inventory() {
   const createMutation = useCreateMedication();
   const updateMutation = useUpdateMedication();
   const deleteMutation = useDeleteMedication();
+  const clearInventoryMutation = useClearInventory(); // ✅ Hook para vaciar inventario
   const createLog = useCreateLog();
   const { toast } = useToast();
 
   // Lógica para encontrar y preparar el medicamento a editar
   const editingMedication = medications?.find((m: any) => m.id === editingId);
   
-  // Aplanamos el objeto: extraemos TODOS los campos del catálogo para el formulario
   const formDefaultValues = editingMedication ? {
     ...editingMedication,
     name: editingMedication.catalog?.name || "",
@@ -66,7 +84,6 @@ export default function Inventory() {
     posology: editingMedication.catalog?.posology || "",
     contraindications: editingMedication.catalog?.contraindications || "",
     interactions: editingMedication.catalog?.interactions || "",
-    // Aseguramos formatos correctos para campos específicos
     quantity: Number(editingMedication.quantity),
     expirationDate: editingMedication.expirationDate ? new Date(editingMedication.expirationDate) : new Date(),
     familyId: editingMedication.familyId?.toString()
@@ -101,7 +118,6 @@ export default function Inventory() {
     if (!medications) return;
     const data = medications.map((m: any) => {
       const date = new Date(m.expirationDate);
-      // Exportamos con los nombres de variables exactos del esquema para que funcione como plantilla de importación
       return {
         name: m.catalog?.name || "",
         dose: m.dose || "",
@@ -116,7 +132,6 @@ export default function Inventory() {
         posology: m.catalog?.posology || "",
         contraindications: m.catalog?.contraindications || "",
         interactions: m.catalog?.interactions || "",
-        // Campos puramente informativos (la importación debe ignorarlos)
         _Familia_Visual: m.family?.name || "No asignada",
         _Estado_Stock: m.quantity === 0 ? "Agotado" : m.quantity < 10 ? "Bajo Stock" : "Disponible"
       };
@@ -133,7 +148,6 @@ export default function Inventory() {
     if (window.confirm(`¿Estás seguro de eliminar ${medicationToDelete?.catalog?.name}? Esta acción no se puede deshacer.`)) {
       try {
         await deleteMutation.mutateAsync(id);
-        
         if (user) {
           await createLog.mutateAsync({
             action: "ELIMINAR",
@@ -141,10 +155,26 @@ export default function Inventory() {
             userId: user.id
           });
         }
-        toast({ title: "Eliminado", description: "El registro ha sido removido del sistema." });
       } catch (error) {
-        toast({ variant: "destructive", title: "Error", description: "No se pudo completar la operación." });
+        // El toast de error ya lo maneja el hook
       }
+    }
+  };
+
+  // ✅ Función para vaciar todo el inventario
+  const handleClearAll = async () => {
+    try {
+      await clearInventoryMutation.mutateAsync();
+      if (user) {
+        await createLog.mutateAsync({
+          action: "ELIMINAR",
+          details: `Se vació TODO el inventario de la sede: ${user.inventoryLocation}`,
+          userId: user.id
+        });
+      }
+      setIsClearDialogOpen(false);
+    } catch (error) {
+      console.error(error);
     }
   };
 
@@ -178,8 +208,43 @@ export default function Inventory() {
 
           {isAdmin && (
             <>
-              <BorrarInventario />
+              {/* ✅ Implementación directa de Vaciar Inventario para asegurar funcionamiento */}
+              <AlertDialog open={isClearDialogOpen} onOpenChange={setIsClearDialogOpen}>
+                <AlertDialogTrigger asChild>
+                  <Button variant="destructive" className="gap-2 font-bold shadow-md">
+                    <Trash2 className="h-4 w-4" /> Vaciar Inventario
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle className="text-destructive">¿Estás absolutamente segura?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Esta acción eliminará **TODOS** los medicamentos de esta sede. 
+                      Esta operación no se puede deshacer y quedará registrada en el historial.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction 
+                      onClick={handleClearAll}
+                      className="bg-destructive text-white hover:bg-destructive/90"
+                      disabled={clearInventoryMutation.isPending}
+                    >
+                      {clearInventoryMutation.isPending ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Borrando...
+                        </>
+                      ) : (
+                        "Sí, vaciar todo el inventario"
+                      )}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+
               <ImportarCSV />
+              
               <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
                 <DialogTrigger asChild>
                   <Button className="gap-2 shadow-lg shadow-primary/20 bg-primary hover:bg-primary/90">
@@ -205,9 +270,8 @@ export default function Inventory() {
                           });
                         }
                         setIsCreateOpen(false);
-                        toast({ title: "Éxito", description: "Medicamento registrado correctamente." });
                       } catch (e) {
-                        toast({ variant: "destructive", title: "Error", description: "No se pudo registrar." });
+                        // El toast de error ya lo maneja el hook
                       }
                     }}
                   />
@@ -309,7 +373,6 @@ export default function Inventory() {
         </Table>
       </div>
       
-      {/* Diálogos fuera del mapeo */}
       {detailId && <MedicationDetail medication={medications.find((m:any) => m.id === detailId)} open={!!detailId} onOpenChange={() => setDetailId(null)} />}
       
       {editingId && (
@@ -320,14 +383,13 @@ export default function Inventory() {
             </DialogHeader>
             {formDefaultValues ? (
               <MedicationForm 
-                key={`edit-${editingId}`} // Forzamos remount para cargar los nuevos defaultValues
+                key={`edit-${editingId}`}
                 families={families}
                 defaultValues={formDefaultValues}
                 isLoading={updateMutation.isPending}
                 submitLabel="Guardar Cambios"
                 onSubmit={async (data: any) => {
                   try {
-                    // Aseguramos que los tipos de datos sean correctos antes de enviar
                     const formattedData = {
                       ...data,
                       familyId: data.familyId ? parseInt(data.familyId) : undefined,
@@ -344,15 +406,9 @@ export default function Inventory() {
                       });
                     }
                     
-                    toast({ title: "Actualizado", description: "Cambios guardados correctamente." });
-                    setEditingId(null); // Cerramos el diálogo solo tras el éxito
+                    setEditingId(null);
                   } catch (e) {
                     console.error("Error al actualizar:", e);
-                    toast({ 
-                      variant: "destructive", 
-                      title: "Error", 
-                      description: "No se pudo actualizar el registro. Inténtalo de nuevo." 
-                    });
                   }
                 }}
               />
