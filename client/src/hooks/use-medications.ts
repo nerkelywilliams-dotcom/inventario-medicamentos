@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, buildUrl } from "@shared/routes";
 import { type InsertMedicationFull, type InsertMedication } from "@shared/schema"; 
 import { useAuth } from "@/context/AuthContext";
+import { useToast } from "@/hooks/use-toast"; // Agregado para feedback visual
 import { z } from "zod";
 
 function encodeUserHeader(user: any): string {
@@ -66,6 +67,7 @@ export function useMedication(id: number) {
 export function useCreateMedication() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const { toast } = useToast();
   
   return useMutation({
     mutationFn: async (data: InsertMedicationFull) => {
@@ -98,7 +100,11 @@ export function useCreateMedication() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.medications.list.path] });
       queryClient.invalidateQueries({ queryKey: ["/api/logs"] });
+      toast({ title: "¡Éxito!", description: "Medicamento registrado correctamente." });
     },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    }
   });
 }
 
@@ -109,6 +115,7 @@ export function useCreateMedication() {
 export function useBulkCreateMedications() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const { toast } = useToast();
   
   return useMutation({
     mutationFn: async (medications: any[]) => {
@@ -123,17 +130,12 @@ export function useBulkCreateMedications() {
       // Normalización de datos antes de enviar (Crucial para Excel/CSV)
       const payload = medications.map(m => ({
         ...m,
-        // Convertimos fechas de string a objeto Date
         expirationDate: m.expirationDate ? new Date(m.expirationDate) : null,
-        // Aseguramos que las cantidades sean números
         quantity: isNaN(Number(m.quantity)) ? 0 : Number(m.quantity),
-        // Normalizamos el booleano isPediatric
         isPediatric: String(m.isPediatric).toUpperCase() === 'TRUE' || m.isPediatric === 'Sí' || m.isPediatric === true,
-        // El familyId debe ser número o null
         familyId: m.familyId ? Number(m.familyId) : null
       }));
 
-      // ✅ CORRECCIÓN DE RUTA: Cambiamos /bulk por /import para coincidir con el backend
       const res = await fetch("/api/medications/import", { 
         method: "POST",
         headers,
@@ -141,14 +143,13 @@ export function useBulkCreateMedications() {
         credentials: "include",
       });
 
-      // Manejo de errores para evitar el crash por HTML (Unexpected token <)
       const contentType = res.headers.get("content-type");
       if (!res.ok) {
         if (contentType && contentType.includes("text/html")) {
-          throw new Error("El servidor devolvió un error 404/500 (HTML). Verifica que la ruta /api/medications/import exista.");
+          throw new Error("Error de ruta (404/500). Verifica que /api/medications/import exista.");
         }
         const error = await res.json();
-        throw new Error(error.message || "Error en la carga masiva de medicamentos");
+        throw new Error(error.message || "Error en la carga masiva");
       }
       
       return await res.json();
@@ -157,17 +158,21 @@ export function useBulkCreateMedications() {
       queryClient.invalidateQueries({ queryKey: [api.medications.list.path] });
       queryClient.invalidateQueries({ queryKey: ["/api/medications"] });
       queryClient.invalidateQueries({ queryKey: ["/api/logs"] });
+      toast({ title: "Importación completada", description: "El inventario ha sido actualizado." });
     },
+    onError: (error: Error) => {
+      toast({ title: "Error en importación", description: error.message, variant: "destructive" });
+    }
   });
 }
 
 /**
  * ✅ NUEVO: Hook para Borrar Inventario
- * Utilizado por el componente BorrarInventario para vaciar la base de datos.
  */
 export function useClearInventory() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const { toast } = useToast();
 
   return useMutation({
     mutationFn: async () => {
@@ -185,8 +190,8 @@ export function useClearInventory() {
         credentials: "include",
       });
 
-      const contentType = res.headers.get("content-type");
       if (!res.ok) {
+        const contentType = res.headers.get("content-type");
         if (contentType && contentType.includes("text/html")) {
           throw new Error("No se pudo limpiar el inventario: Error de ruta (404/500).");
         }
@@ -195,16 +200,22 @@ export function useClearInventory() {
       }
     },
     onSuccess: () => {
+      // Forzamos el refresco de todas las listas relacionadas
       queryClient.invalidateQueries({ queryKey: [api.medications.list.path] });
       queryClient.invalidateQueries({ queryKey: ["/api/medications"] });
       queryClient.invalidateQueries({ queryKey: ["/api/logs"] });
+      toast({ title: "Inventario vaciado", description: "Se han eliminado todos los registros." });
     },
+    onError: (error: Error) => {
+      toast({ title: "Error al vaciar", description: error.message, variant: "destructive" });
+    }
   });
 }
 
 export function useUpdateMedication() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const { toast } = useToast();
   
   return useMutation({
     mutationFn: async ({ id, ...updates }: { id: number } & Partial<InsertMedication>) => {
@@ -237,6 +248,7 @@ export function useUpdateMedication() {
       queryClient.invalidateQueries({ queryKey: [api.medications.list.path] });
       queryClient.invalidateQueries({ queryKey: [api.medications.get.path] });
       queryClient.invalidateQueries({ queryKey: ["/api/logs"] });
+      toast({ title: "Actualizado", description: "Medicamento modificado con éxito." });
     },
   });
 }
@@ -244,6 +256,7 @@ export function useUpdateMedication() {
 export function useDeleteMedication() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const { toast } = useToast();
   
   return useMutation({
     mutationFn: async (id: number) => {
@@ -267,6 +280,7 @@ export function useDeleteMedication() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.medications.list.path] });
       queryClient.invalidateQueries({ queryKey: ["/api/logs"] });
+      toast({ title: "Eliminado", description: "Medicamento removido del inventario." });
     },
   });
 }
