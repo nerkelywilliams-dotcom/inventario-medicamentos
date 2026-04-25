@@ -109,8 +109,8 @@ export function useCreateMedication() {
 }
 
 /**
- * ✅ NUEVO: Hook para Importación Masiva
- * Procesa un arreglo de medicamentos y los envía al backend.
+ * ✅ ACTUALIZADO: Hook para Importación Masiva (Blindado para Excel)
+ * Mapea automáticamente columnas y limpia datos corruptos del Excel.
  */
 export function useBulkCreateMedications() {
   const queryClient = useQueryClient();
@@ -127,14 +127,44 @@ export function useBulkCreateMedications() {
         headers["x-user"] = encodeUserHeader(user);
       }
 
-      // Normalización de datos antes de enviar (Crucial para Excel/CSV)
-      const payload = medications.map(m => ({
-        ...m,
-        expirationDate: m.expirationDate ? new Date(m.expirationDate) : null,
-        quantity: isNaN(Number(m.quantity)) ? 0 : Number(m.quantity),
-        isPediatric: String(m.isPediatric).toUpperCase() === 'TRUE' || m.isPediatric === 'Sí' || m.isPediatric === true,
-        familyId: m.familyId ? Number(m.familyId) : null
-      }));
+      // ✅ MAPEO INTELIGENTE: Si el Excel tiene nombres de columnas variados, los unificamos aquí
+      const payload = medications.map(m => {
+        // Normalización de fechas para evitar "Invalid Date"
+        let finalDate: Date;
+        try {
+          const rawDate = m.expirationDate || m.expiration || m.fecha_vencimiento || m.vencimiento;
+          finalDate = rawDate ? new Date(rawDate) : new Date();
+          if (isNaN(finalDate.getTime())) finalDate = new Date();
+        } catch (e) {
+          finalDate = new Date();
+        }
+
+        return {
+          // Datos del Catálogo (Buscamos sinónimos en las columnas del Excel)
+          name: String(m.name || m.nombre || m.medicamento || "Sin nombre").trim(),
+          description: String(m.description || m.descripcion || "").trim(),
+          mechanismOfAction: String(m.mechanismOfAction || m.mechanism || m.accion || m.mecanismo || "").trim(),
+          indications: String(m.indications || m.indicaciones || "").trim(),
+          posology: String(m.posology || m.posologia || "").trim(),
+          contraindications: String(m.contraindications || m.contraindicaciones || "No especificadas").trim(),
+          interactions: String(m.interactions || m.interacciones || "No especificadas").trim(),
+          
+          // Datos de Inventario
+          dose: String(m.dose || m.dosis || "Ver empaque").trim(),
+          presentation: String(m.presentation || m.presentacion || "No especificada").trim(),
+          quantity: isNaN(Number(m.quantity || m.cantidad || m.stock)) ? 0 : Number(m.quantity || m.cantidad || m.stock),
+          expirationDate: finalDate,
+          
+          // Lógica booleana para Pediatría
+          isPediatric: 
+            String(m.isPediatric || m.pediatrico || "").toUpperCase() === 'TRUE' || 
+            m.isPediatric === 'Sí' || 
+            m.isPediatric === 'Si' ||
+            m.isPediatric === true,
+            
+          familyId: m.familyId || m.familia || m.id_familia ? Number(m.familyId || m.familia || m.id_familia) : null
+        };
+      });
 
       const res = await fetch("/api/medications/import", { 
         method: "POST",
@@ -146,7 +176,7 @@ export function useBulkCreateMedications() {
       const contentType = res.headers.get("content-type");
       if (!res.ok) {
         if (contentType && contentType.includes("text/html")) {
-          throw new Error("Error de ruta (404/500). Verifica que /api/medications/import exista.");
+          throw new Error("Error de ruta (404/500). Verifica que el servidor esté encendido.");
         }
         const error = await res.json();
         throw new Error(error.message || "Error en la carga masiva");
@@ -154,13 +184,17 @@ export function useBulkCreateMedications() {
       
       return await res.json();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: [api.medications.list.path] });
       queryClient.invalidateQueries({ queryKey: ["/api/medications"] });
       queryClient.invalidateQueries({ queryKey: ["/api/logs"] });
-      toast({ title: "Importación completada", description: "El inventario ha sido actualizado." });
+      toast({ 
+        title: "Importación completada", 
+        description: `Se han procesado ${data.count || ''} registros exitosamente.` 
+      });
     },
     onError: (error: Error) => {
+      console.error("Error importación:", error);
       toast({ title: "Error en importación", description: error.message, variant: "destructive" });
     }
   });
@@ -184,7 +218,7 @@ export function useClearInventory() {
         headers["x-user"] = encodeUserHeader(user);
       }
 
-      const res = await fetch("/api/medications", {
+      const res = await fetch("/api/medications/all", {
         method: "DELETE",
         headers,
         credentials: "include",
