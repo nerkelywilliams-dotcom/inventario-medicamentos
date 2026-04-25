@@ -93,7 +93,6 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
-
   // --- RUTAS DE MEDICAMENTOS (CON LOGS REFORZADOS) ---
   app.get(api.medications.list.path, async (req, res) => {
     const location = req.user?.inventoryLocation || "magdaleno";
@@ -200,7 +199,6 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
-
   // --- BITÁCORA (CON LÓGICA DE RESCATE DE DATOS) ---
   app.get('/api/logs', async (req, res) => {
     const location = req.user?.inventoryLocation || "magdaleno";
@@ -252,12 +250,36 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     try {
       const location = req.user?.inventoryLocation || "magdaleno";
       const items = req.body;
+      
       if (!Array.isArray(items)) return res.status(400).json({ message: "Formato inválido" });
-      const validatedItems = items.map(item => insertMedicationFullSchema.parse(item));
+      
+      // ✅ RESCATE DE DATOS PARA EVITAR ERROR 400 EN IMPORTACIONES MASIVAS
+      const sanitizedItems = items.map(item => {
+        return {
+          ...item,
+          // Si el esquema exige un nombre y no lo hay, asigna uno genérico
+          name: item.name && item.name.trim() !== "" ? item.name : "Medicamento sin nombre",
+          // Si exige dosis y no la hay (como en la fila 13 de tu Excel), asigna "N/A"
+          dose: item.dose && item.dose.trim() !== "" ? item.dose : "N/A",
+          // Si exige presentación y no la hay, asigna "N/A"
+          presentation: item.presentation && item.presentation.trim() !== "" ? item.presentation : "N/A",
+          // Asegurar un número en la cantidad
+          quantity: item.quantity ? parseInt(item.quantity) : 0,
+          // Mantener la familia como null si no viene, o forzarla a un ID si tu esquema lo requiere obligatoriamente.
+          familyId: item.familyId || null 
+        };
+      });
+
+      // Validamos los ítems ya "limpios"
+      const validatedItems = sanitizedItems.map(item => insertMedicationFullSchema.parse(item));
+      
       await storage.importMedications(validatedItems, location);
       res.status(200).json({ message: "Importación exitosa", count: validatedItems.length });
+      
     } catch (error: any) {
-      res.status(400).json({ message: "Error de validación", error: error.message });
+      // ✅ MEJORA PARA DEBUGGING: Mostramos qué campo exacto falló en la consola del servidor
+      console.error("Detalle del error Zod:", JSON.stringify(error, null, 2));
+      res.status(400).json({ message: "Error de validación", error: error.issues || error.message });
     }
   });
 
