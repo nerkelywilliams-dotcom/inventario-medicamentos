@@ -108,10 +108,12 @@ export const insertMedicationSchema = createInsertSchema(medications).omit({
   catalogId: true, 
 });
 
-// --- ESQUEMA FULL CORREGIDO (EL QUE USA EL FORMULARIO) ---
+// --- ESQUEMA FULL CORREGIDO (RESISTENTE A IMPORTACIONES DE EXCEL) ---
 export const insertMedicationFullSchema = z.object({
-  // Campos del catálogo
-  name: z.string().min(1, "El nombre del medicamento es requerido"),
+  // Campos del catálogo con rescate de datos
+  name: z.preprocess((val) => (val === "" || val === null || val === undefined ? "Medicamento sin nombre" : val), 
+    z.string().min(1, "El nombre del medicamento es requerido").default("Medicamento sin nombre")),
+  
   description: z.string().optional().nullable(),
   
   // imageUrl acepta File para el cliente o string para la base de datos
@@ -123,20 +125,35 @@ export const insertMedicationFullSchema = z.object({
   administrationRoute: z.string().optional().nullable(),
   
   // Ajuste para coincidir con los defaults de la DB si vienen vacíos
-  contraindications: z.preprocess((val) => val === "" || val === null ? "No especificadas" : val, z.string().default("No especificadas")),
-  interactions: z.preprocess((val) => val === "" || val === null ? "No especificadas" : val, z.string().default("No especificadas")),
+  contraindications: z.preprocess((val) => val === "" || val === null ? "No especificadas" : val, 
+    z.string().default("No especificadas")),
+  
+  interactions: z.preprocess((val) => val === "" || val === null ? "No especificadas" : val, 
+    z.string().default("No especificadas")),
   
   // Campos de inventario
-  dose: z.preprocess((val) => (val === "" || val === null ? "Ver empaque" : val), z.string().default("Ver empaque")),
-  presentation: z.string().min(1, "La presentación es requerida"),
+  dose: z.preprocess((val) => (val === "" || val === null ? "Ver empaque" : val), 
+    z.string().default("Ver empaque")),
+  
+  presentation: z.preprocess((val) => (val === "" || val === null || val === undefined ? "No especificada" : val), 
+    z.string().min(1, "La presentación es requerida").default("No especificada")),
   
   // Coerción mejorada para asegurar que siempre sean números
   quantity: z.coerce.number().int().min(0, "El stock no puede ser negativo").default(0),
-  expirationDate: z.coerce.date({
+  
+  expirationDate: z.preprocess((val) => {
+    if (!val || val === "") return new Date(); // Si no hay fecha, pone hoy para evitar error 400
+    return val;
+  }, z.coerce.date({
     required_error: "La fecha de vencimiento es requerida",
     invalid_type_error: "Formato de fecha inválido",
-  }), 
-  isPediatric: z.boolean().default(false),
+  })), 
+
+  isPediatric: z.preprocess((val) => {
+    if (typeof val === "string") return val.toUpperCase() === "TRUE";
+    return !!val;
+  }, z.boolean().default(false)),
+
   familyId: z.coerce.number().int().optional().nullable(),
 });
 
