@@ -186,6 +186,7 @@ export class DatabaseStorage implements IStorage {
     const current = await this.getMedication(id);
     if (!current) return undefined;
 
+    // Actualizar catálogo si vienen campos descriptivos
     if (updates.name || updates.mechanismOfAction || updates.indications || updates.contraindications) {
       await db.update(medicationCatalog)
         .set({
@@ -202,6 +203,7 @@ export class DatabaseStorage implements IStorage {
         .where(eq(medicationCatalog.id, current.catalogId));
     }
 
+    // Actualizar stock y datos de inventario
     const [updatedMedication] = await db.update(medications)
       .set({
         familyId: updates.familyId,
@@ -222,12 +224,36 @@ export class DatabaseStorage implements IStorage {
   }
 
   async importMedications(items: any[], inventoryLocation: string): Promise<void> {
-    for (const item of items) {
-      await this.createMedication({
-        ...item,
-        inventoryLocation: inventoryLocation
-      });
-    }
+    // Usamos una transacción para asegurar integridad en importaciones masivas
+    await db.transaction(async (tx) => {
+      for (const item of items) {
+        // Buscamos o creamos en el catálogo dentro de la transacción
+        let [catalogEntry] = await tx
+          .select()
+          .from(medicationCatalog)
+          .where(eq(medicationCatalog.name, item.name));
+
+        if (!catalogEntry) {
+          [catalogEntry] = await tx.insert(medicationCatalog).values({
+            name: item.name,
+            dose: item.dose || "N/A",
+            presentation: item.presentation || "N/A",
+            contraindications: "No especificadas",
+            interactions: "No especificadas"
+          }).returning();
+        }
+
+        await tx.insert(medications).values({
+          catalogId: catalogEntry.id,
+          familyId: item.familyId || null,
+          dose: item.dose || catalogEntry.dose,
+          presentation: item.presentation || catalogEntry.presentation,
+          quantity: item.quantity || 0,
+          expirationDate: item.expirationDate,
+          inventoryLocation: inventoryLocation
+        });
+      }
+    });
   }
 
   async deleteAllMedications(inventoryLocation: string): Promise<void> {
@@ -258,13 +284,14 @@ export class DatabaseStorage implements IStorage {
 
   // --- LOGS ---
   async createLog(insertLog: any): Promise<Log> {
+    // Intenta buscar el admin para asignar el log si no viene userId
     const [adminUser] = await db
       .select()
       .from(users)
       .where(eq(users.username, "admin_mag"))
       .limit(1);
 
-    const validUserId = adminUser ? adminUser.id : null;
+    const validUserId = insertLog.userId || (adminUser ? adminUser.id : null);
 
     const [newLog] = await db.insert(logs).values({
       action: insertLog.action || "ACTUALIZACIÓN",
@@ -290,8 +317,7 @@ export class DatabaseStorage implements IStorage {
 
     if (!inventoryLocation) return allLogs as LogWithUser[];
 
-    // SOLUCIÓN: Filtro ultra-permisivo. Si la columna inventoryLocation no existe 
-    // en la DB (!l.inventoryLocation), entonces NO lo filtramos, lo mostramos igual.
+    // Filtro para la ubicación específica
     return allLogs.filter(l => 
       !l.inventoryLocation || l.inventoryLocation.toLowerCase() === inventoryLocation.toLowerCase()
     ) as LogWithUser[];
