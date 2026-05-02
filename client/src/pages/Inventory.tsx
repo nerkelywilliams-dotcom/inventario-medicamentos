@@ -32,8 +32,8 @@ import {
 import { MedicationForm } from "@/components/MedicationForm";
 import { MedicationDetail } from "@/components/MedicationDetail";
 import { ExpiryBadge, StockBadge } from "@/components/StatusBadges";
-import { Search, Plus, FileDown, Eye, Pencil, Trash2, FilterX, Baby, Loader2, Upload } from "lucide-react";
-import { format, isValid } from "date-fns";
+import { Search, Plus, FileDown, Eye, Pencil, Trash2, Baby, Loader2, Upload } from "lucide-react";
+import { format } from "date-fns";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { useSearch, Link } from "wouter";
@@ -107,7 +107,7 @@ export default function Inventory() {
       quantity: m.quantity || 0,
       expirationDate: m.expirationDate ? format(new Date(m.expirationDate), "yyyy-MM-dd") : "",
       isPediatric: m.isPediatric ? "TRUE" : "FALSE",
-      familyId: m.familyId || "", // Es mejor exportar el ID para la re-importación
+      familyId: m.familyId || "",
       description: m.catalog?.description || "",
       actionMechanism: m.catalog?.actionMechanism || "",
       indications: m.catalog?.indications || "",
@@ -135,41 +135,55 @@ export default function Inventory() {
         const wsname = wb.SheetNames[0];
         const rawData: any[] = XLSX.utils.sheet_to_json(wb.Sheets[wsname]);
 
-        // Mapeo de nombres de familia a IDs para evitar errores de validación
         const familyMap = new Map(families.map((f: any) => [f.name.toLowerCase().trim(), f.id]));
 
         const formattedData = rawData.map((row: any) => {
-          // Intentar obtener ID de familia si el usuario escribió el nombre
           let fId = row.familyId;
           if (typeof row.familyId === 'string' && isNaN(Number(row.familyId))) {
             fId = familyMap.get(row.familyId.toLowerCase().trim()) || null;
           }
 
+          // Validación de fecha segura
+          let dateValue: string;
+          try {
+            if (row.expirationDate instanceof Date) {
+              dateValue = row.expirationDate.toISOString();
+            } else if (row.expirationDate) {
+              const parsedDate = new Date(row.expirationDate);
+              dateValue = isNaN(parsedDate.getTime()) ? new Date().toISOString() : parsedDate.toISOString();
+            } else {
+              dateValue = new Date().toISOString();
+            }
+          } catch {
+            dateValue = new Date().toISOString();
+          }
+
           return {
-            name: String(row.name || "").trim(),
-            dose: String(row.dose || "").trim(),
-            presentation: String(row.presentation || "").trim(),
+            name: String(row.name || "Sin Nombre").trim(),
+            dose: String(row.dose || "N/A").trim(),
+            presentation: String(row.presentation || "N/A").trim(),
             quantity: parseInt(row.quantity) || 0,
-            expirationDate: row.expirationDate instanceof Date 
-              ? row.expirationDate.toISOString() 
-              : new Date(row.expirationDate).toISOString(),
+            expirationDate: dateValue,
             isPediatric: String(row.isPediatric).toUpperCase() === "TRUE",
             familyId: fId ? parseInt(fId) : null,
-            description: String(row.description || ""),
-            actionMechanism: String(row.actionMechanism || ""),
-            indications: String(row.indications || ""),
-            posology: String(row.posology || ""),
-            contraindications: String(row.contraindications || ""),
-            interactions: String(row.interactions || "")
+            description: String(row.description || "").trim(),
+            actionMechanism: String(row.actionMechanism || row.actionMecha || "").trim(),
+            indications: String(row.indications || "").trim(),
+            posology: String(row.posology || "").trim(),
+            contraindications: String(row.contraindications || row.contraindicat || "").trim(),
+            interactions: String(row.interactions || "").trim()
           };
         });
 
         await bulkCreateMutation.mutateAsync(formattedData);
-        toast({ title: "Importación completada", description: `Se cargaron ${formattedData.length} registros.` });
         if (user) await createLog.mutateAsync({ action: "CREAR", details: `Importación masiva: ${formattedData.length} ítems.`, userId: user.id });
       } catch (error: any) {
         console.error("Error detallado:", error);
-        toast({ variant: "destructive", title: "Error de validación", description: "Revisa que los campos obligatorios (nombre, dosis, cantidad) no estén vacíos." });
+        toast({ 
+          variant: "destructive", 
+          title: "Error de Importación", 
+          description: error.message || "Revisa el formato de tu Excel." 
+        });
       } finally {
         if (fileInputRef.current) fileInputRef.current.value = "";
       }
@@ -186,9 +200,13 @@ export default function Inventory() {
   };
 
   const handleClearAll = async () => {
-    await clearInventoryMutation.mutateAsync();
-    if (user) await createLog.mutateAsync({ action: "ELIMINAR", details: "Vaciado de inventario", userId: user.id });
-    setIsClearDialogOpen(false);
+    try {
+      await clearInventoryMutation.mutateAsync();
+      if (user) await createLog.mutateAsync({ action: "ELIMINAR", details: "Vaciado de inventario", userId: user.id });
+      setIsClearDialogOpen(false);
+    } catch (error: any) {
+      toast({ variant: "destructive", title: "Error al vaciar", description: error.message });
+    }
   };
 
   return (
@@ -238,7 +256,17 @@ export default function Inventory() {
                   </AlertDialogHeader>
                   <AlertDialogFooter>
                     <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleClearAll} className="bg-destructive hover:bg-destructive/90">Sí, borrar todo</AlertDialogAction>
+                    <AlertDialogAction 
+                      onClick={(e) => {
+                        e.preventDefault();
+                        handleClearAll();
+                      }} 
+                      className="bg-destructive hover:bg-destructive/90"
+                      disabled={clearInventoryMutation.isPending}
+                    >
+                      {clearInventoryMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                      Sí, borrar todo
+                    </AlertDialogAction>
                   </AlertDialogFooter>
                 </AlertDialogContent>
               </AlertDialog>
