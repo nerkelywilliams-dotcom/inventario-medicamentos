@@ -1,5 +1,15 @@
 import { z } from 'zod';
-import { insertFamilySchema, insertMedicationSchema, families, medications, medicationCatalog } from './schema';
+import { 
+  insertFamilySchema, 
+  insertMedicationFullSchema, 
+  families, 
+  medications, 
+  medicationCatalog, 
+  users, 
+  logs, 
+  loginSchema,
+  insertLogSchema
+} from './schema';
 
 export const errorSchemas = {
   validation: z.object({
@@ -15,6 +25,32 @@ export const errorSchemas = {
 };
 
 export const api = {
+  auth: {
+    user: {
+      method: 'GET' as const,
+      path: '/api/user',
+      responses: {
+        200: z.custom<Omit<typeof users.$inferSelect, 'password'>>(),
+        401: errorSchemas.notFound,
+      },
+    },
+    login: {
+      method: 'POST' as const,
+      path: '/api/auth/login',
+      input: loginSchema,
+      responses: {
+        200: z.custom<Omit<typeof users.$inferSelect, 'password'>>(),
+        401: errorSchemas.validation,
+      },
+    },
+    logout: {
+      method: 'POST' as const,
+      path: '/api/auth/logout',
+      responses: {
+        200: z.object({ message: z.string() }),
+      },
+    },
+  },
   families: {
     list: {
       method: 'GET' as const,
@@ -39,7 +75,25 @@ export const api = {
         200: z.custom<typeof families.$inferSelect>(),
         404: errorSchemas.notFound,
       },
-    }
+    },
+    update: {
+      method: 'PATCH' as const,
+      path: '/api/families/:id',
+      input: insertFamilySchema.partial(),
+      responses: {
+        200: z.custom<typeof families.$inferSelect>(),
+        400: errorSchemas.validation,
+        404: errorSchemas.notFound,
+      },
+    },
+    delete: {
+      method: 'DELETE' as const,
+      path: '/api/families/:id',
+      responses: {
+        204: z.void(),
+        400: errorSchemas.internal,
+      },
+    },
   },
   medications: {
     list: {
@@ -64,7 +118,7 @@ export const api = {
     create: {
       method: 'POST' as const,
       path: '/api/medications',
-      input: insertMedicationSchema,
+      input: insertMedicationFullSchema,
       responses: {
         201: z.custom<typeof medications.$inferSelect & { catalog: typeof medicationCatalog.$inferSelect }>(),
         400: errorSchemas.validation,
@@ -73,7 +127,17 @@ export const api = {
     update: {
       method: 'PUT' as const,
       path: '/api/medications/:id',
-      input: insertMedicationSchema.partial(),
+      input: insertMedicationFullSchema.partial(),
+      responses: {
+        200: z.custom<typeof medications.$inferSelect & { catalog: typeof medicationCatalog.$inferSelect }>(),
+        400: errorSchemas.validation,
+        404: errorSchemas.notFound,
+      },
+    },
+    patch: {
+      method: 'PATCH' as const,
+      path: '/api/medications/:id',
+      input: insertMedicationFullSchema.partial(),
       responses: {
         200: z.custom<typeof medications.$inferSelect & { catalog: typeof medicationCatalog.$inferSelect }>(),
         400: errorSchemas.validation,
@@ -86,6 +150,54 @@ export const api = {
       responses: {
         204: z.void(),
         404: errorSchemas.notFound,
+      },
+    },
+    import: {
+      method: 'POST' as const,
+      path: '/api/medications/import',
+      input: z.array(z.any()),
+      responses: {
+        200: z.object({ message: z.string(), count: z.number() }),
+        400: errorSchemas.validation,
+      },
+    },
+    deleteAll: {
+      method: 'DELETE' as const,
+      path: '/api/medications/all',
+      responses: {
+        200: z.object({ message: z.string() }),
+        403: z.object({ message: z.string() }),
+      },
+    },
+  },
+  logs: {
+    list: {
+      method: 'GET' as const,
+      path: '/api/logs',
+      responses: {
+        200: z.array(z.custom<typeof logs.$inferSelect & { user: typeof users.$inferSelect }>()),
+      },
+    },
+    create: {
+      method: 'POST' as const,
+      path: '/api/logs',
+      input: insertLogSchema,
+      responses: {
+        201: z.custom<typeof logs.$inferSelect>(),
+      },
+    },
+  },
+  inventory: {
+    stats: {
+      method: 'GET' as const,
+      path: '/api/inventory/stats',
+      responses: {
+        200: z.object({
+          totalProducts: z.number(),
+          lowStock: z.number(),
+          outOfStock: z.number(),
+          totalItems: z.number(),
+        }),
       },
     },
   },
