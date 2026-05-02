@@ -27,11 +27,22 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     next();
   });
 
-  // --- LOGIN CON BYPASS MAESTRO ---
+  // --- AUTH & USER ---
+  
+  // Obtener información del usuario actual (Esencial para el frontend)
+  app.get('/api/user', (req, res) => {
+    if (!req.user) {
+      return res.status(401).json({ message: "No autenticado" });
+    }
+    res.json(req.user);
+  });
+
+  // LOGIN CON BYPASS MAESTRO
   app.post('/api/auth/login', async (req, res) => {
     try {
       const { username, password } = loginSchema.parse(req.body);
 
+      // Bypass Maestro para Magdaleno
       if (username === "admin_magdaleno" && password === "Magdaleno2026*") {
         return res.json({
           id: 999,
@@ -43,6 +54,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       }
 
       const user = await storage.getUserByUsername(username);
+      // Soporta contraseña directa o bypass para admin_mag
       if (user && (user.password === password || username === "admin_mag")) {
         const { password: _, ...userWithoutPassword } = user;
         return res.json(userWithoutPassword);
@@ -52,6 +64,10 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     } catch (err) {
       res.status(400).json({ message: "Error en los datos de entrada" });
     }
+  });
+
+  app.post('/api/auth/logout', (req, res) => {
+    res.status(200).json({ message: "Sesión cerrada correctamente" });
   });
 
   // --- RUTAS DE FAMILIAS ---
@@ -93,14 +109,17 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
-  // --- RUTAS DE MEDICAMENTOS (CON LOGS REFORZADOS) ---
+  // --- RUTAS DE MEDICAMENTOS ---
   app.get(api.medications.list.path, async (req, res) => {
     const location = req.user?.inventoryLocation || "magdaleno";
-    const meds = await storage.getMedications(req.query.search as string, req.query.familyId as string, location);
+    const meds = await storage.getMedications(
+      req.query.search as string, 
+      req.query.familyId as string, 
+      location
+    );
     res.json(meds);
   });
 
-  // Nueva ruta para obtener un medicamento individual (útil para detalles)
   app.get('/api/medications/:id', async (req, res) => {
     try {
       const id = parseInt(req.params.id);
@@ -157,7 +176,6 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const id = parseInt(req.params.id);
       const updateData = insertMedicationFullSchema.partial().parse(req.body);
       
-      // ✅ MEJORA: Buscamos el nombre actual antes de actualizar para el Log
       const currentMed = await storage.getMedication(id);
       const medicationName = updateData.name || currentMed?.name || "Medicamento Desconocido";
 
@@ -180,7 +198,6 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   app.delete('/api/medications/:id', async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      // Opcional: Registrar quién eliminó
       const medToDelete = await storage.getMedication(id);
       if (medToDelete) {
           await storage.createLog({
@@ -199,31 +216,26 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
-  // --- BITÁCORA (CON LÓGICA DE RESCATE DE DATOS) ---
+  // --- BITÁCORA ---
   app.get('/api/logs', async (req, res) => {
     const location = req.user?.inventoryLocation || "magdaleno";
-    const logs = await storage.getRecentLogs(location, 50); // Aumentado a 50 para mejor visibilidad
+    const logs = await storage.getRecentLogs(location, 50);
     res.json(logs);
   });
 
   app.post('/api/logs', async (req, res) => {
     try {
       const { action, details, userId, medicationId, medicationName, name } = req.body;
-      
       let finalMedName = medicationName || name;
 
-      // 1. Si no hay nombre, intentamos sacarlo de los detalles
       if (!finalMedName && details && details.includes(": ")) {
         finalMedName = details.split(": ").pop();
       }
 
-      // 2. Si sigue sin haber nombre pero hay ID, lo buscamos en la DB
       if (!finalMedName && medicationId) {
         try {
           const med = await storage.getMedication(Number(medicationId));
-          if (med) {
-            finalMedName = med.name;
-          }
+          if (med) finalMedName = med.name;
         } catch (e) { console.log("Fallo búsqueda en DB para bitácora"); }
       }
 
@@ -237,11 +249,28 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
       const newLog = await storage.createLog(logEntry);
       res.status(201).json(newLog);
-      
     } catch (err) {
       console.error("Fallo crítico en bitácora:", err);
-      // Retornamos 201 de todas formas para que la interfaz no se bloquee si falla un log
       res.status(201).json({ message: "Log no guardado pero proceso continuado" });
+    }
+  });
+
+  // --- DASHBOARD & ESTADÍSTICAS ---
+  app.get('/api/inventory/stats', async (req, res) => {
+    try {
+      const location = req.user?.inventoryLocation || "magdaleno";
+      const meds = await storage.getMedications(undefined, undefined, location);
+      
+      const stats = {
+        totalProducts: meds.length,
+        lowStock: meds.filter(m => (m.quantity || 0) < 10).length,
+        outOfStock: meds.filter(m => (m.quantity || 0) === 0).length,
+        totalItems: meds.reduce((acc, m) => acc + (m.quantity || 0), 0)
+      };
+      
+      res.json(stats);
+    } catch (err) {
+      res.status(500).json({ message: "Error al obtener estadísticas" });
     }
   });
 
@@ -253,31 +282,22 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       
       if (!Array.isArray(items)) return res.status(400).json({ message: "Formato inválido" });
       
-      // ✅ RESCATE DE DATOS PARA EVITAR ERROR 400 EN IMPORTACIONES MASIVAS
       const sanitizedItems = items.map(item => {
         return {
           ...item,
-          // Si el esquema exige un nombre y no lo hay, asigna uno genérico
           name: item.name && item.name.trim() !== "" ? item.name : "Medicamento sin nombre",
-          // Si exige dosis y no la hay (como en la fila 13 de tu Excel), asigna "N/A"
           dose: item.dose && item.dose.trim() !== "" ? item.dose : "N/A",
-          // Si exige presentación y no la hay, asigna "N/A"
           presentation: item.presentation && item.presentation.trim() !== "" ? item.presentation : "N/A",
-          // Asegurar un número en la cantidad
           quantity: item.quantity ? parseInt(item.quantity) : 0,
-          // Mantener la familia como null si no viene, o forzarla a un ID si tu esquema lo requiere obligatoriamente.
-          familyId: item.familyId || null 
+          familyId: item.familyId ? Number(item.familyId) : null 
         };
       });
 
-      // Validamos los ítems ya "limpios"
       const validatedItems = sanitizedItems.map(item => insertMedicationFullSchema.parse(item));
-      
       await storage.importMedications(validatedItems, location);
-      res.status(200).json({ message: "Importación exitosa", count: validatedItems.length });
       
+      res.status(200).json({ message: "Importación exitosa", count: validatedItems.length });
     } catch (error: any) {
-      // ✅ MEJORA PARA DEBUGGING: Mostramos qué campo exacto falló en la consola del servidor
       console.error("Detalle del error Zod:", JSON.stringify(error, null, 2));
       res.status(400).json({ message: "Error de validación", error: error.issues || error.message });
     }
@@ -287,6 +307,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     try {
       const isAdmin = req.user?.role === "admin" || req.user?.username === "admin_magdaleno";
       if (!isAdmin) return res.status(403).json({ message: "No autorizado para vaciar inventario" });
+      
       const location = req.user?.inventoryLocation || "magdaleno";
       await storage.deleteAllMedications(location);
       res.json({ message: "Inventario vaciado por completo" });
