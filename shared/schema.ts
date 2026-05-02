@@ -58,7 +58,9 @@ export const logs = pgTable("logs", {
   userId: integer("user_id").references(() => users.id), 
   action: text("action").notNull(), 
   medicationName: text("medication_name").notNull(), 
+  medicationId: integer("medication_id"), // Añadido para consistencia con storage.ts
   details: text("details"), 
+  inventoryLocation: text("inventory_location").notNull().default("maracay"), // Añadido para consistencia
   timestamp: timestamp("timestamp").defaultNow().notNull(),
 });
 
@@ -166,12 +168,14 @@ export const insertFamilySchema = createInsertSchema(families).omit({
 // Usuarios
 export const insertUserSchema = createInsertSchema(users).omit({ id: true });
 
-// Logs (CORREGIDO: Se hace flexible para evitar errores 400 en el guardado)
+// Logs (CORREGIDO: Flexible e incluye nuevos campos de seguimiento)
 export const insertLogSchema = z.object({
   userId: z.coerce.number().int().optional().nullable(),
   action: z.string().min(1, "La acción es requerida"),
   medicationName: z.preprocess((val) => val ?? "Sistema", z.string().default("Sistema")),
+  medicationId: z.coerce.number().int().optional().nullable(),
   details: z.string().optional().nullable(),
+  inventoryLocation: z.string().optional().nullable(),
 });
 
 // Login
