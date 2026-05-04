@@ -27,9 +27,12 @@ En el Web Service, ve a **Environment** y añade:
 ```
 DATABASE_URL = postgresql://user:password@host:5432/database
 NODE_ENV = production
+OPENAI_API_KEY = tu_api_key_de_openai
 ```
 
 **La DATABASE_URL debe ser la URL interna de tu base de datos PostgreSQL**
+
+Si no quieres usar IA real, puedes dejar `OPENAI_API_KEY` vacío y el chat seguirá respondiendo con inteligencia básica basada en el inventario.
 
 ### 3.1. **¿Qué sucede durante el deploy?**
 

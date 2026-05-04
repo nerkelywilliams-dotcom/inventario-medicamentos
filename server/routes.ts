@@ -384,7 +384,73 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
 
     const fallbackNames = Array.from(new Set(meds.slice(0, 8).map((med: any) => med.catalog?.name))).join(", ");
-    return `Puedo responder consultas sobre familias, stock, vencimientos y usos. En esta sede hay ${meds.length} medicamentos registrados. Algunos ejemplos son: ${fallbackNames}.`; 
+    return `Puedo responder consultas sobre familias, stock, vencimientos y usos. En esta sede hay ${meds.length} medicamentos registrados. Algunos ejemplos son: ${fallbackNames}.`;
+  }
+
+  function buildInventoryContext(meds: any[], families: any[]) {
+    const totalUnits = meds.reduce((acc: number, med: any) => acc + (med.quantity || 0), 0);
+    const lowStock = meds.filter((med: any) => (med.quantity || 0) < 10).map((med: any) => med.catalog?.name || med.name).slice(0, 8);
+    const expired = meds.filter((med: any) => med.expirationDate && new Date(med.expirationDate) < new Date()).map((med: any) => med.catalog?.name || med.name).slice(0, 8);
+    const familyDescriptions = families.map((family: any) => {
+      const count = meds.filter((med: any) => med.family?.id === family.id).length;
+      return `${family.name}: ${count} medicamentos`;
+    });
+    const sample = meds.slice(0, 12).map((med: any) => {
+      const presentation = med.presentation || "sin presentación";
+      const family = med.family?.name || "sin familia";
+      const quantity = med.quantity || 0;
+      const expiration = med.expirationDate ? `vence ${med.expirationDate}` : "sin fecha de vencimiento";
+      return `- ${med.catalog?.name || med.name} (${presentation}, familia: ${family}, cantidad: ${quantity}, ${expiration})`;
+    });
+
+    return `Inventario actual: ${meds.length} registros, ${totalUnits} unidades totales. Familias: ${familyDescriptions.join(", ")}. ` +
+      `${lowStock.length > 0 ? `Bajo stock: ${lowStock.join(", ")}. ` : "No hay medicamentos con stock crítico. "} ` +
+      `${expired.length > 0 ? `Vencidos o próximos a vencer: ${expired.join(", ")}. ` : "No hay medicamentos vencidos actualmente. "} ` +
+      `Muestra de productos: ${sample.join(" ")}.`;
+  }
+
+  async function callOpenAIInventoryAssistant(prompt: string, meds: any[], families: any[]) {
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) {
+      return `${answerFromInventory(prompt, meds, families)}\n\n(Activa OPENAI_API_KEY en el servidor para obtener respuestas generadas por IA.)`;
+    }
+
+    const inventoryContext = buildInventoryContext(meds, families);
+    const systemMessage = {
+      role: "system",
+      content: "Eres un asistente experto en inventarios de medicamentos. Responde en español con claridad, basándote en el contexto del inventario proporcionado. No inventes medicamentos que no estén en el inventario actual."
+    };
+    const userMessage = {
+      role: "user",
+      content: `Tengo el siguiente contexto de inventario:\n${inventoryContext}\n\nPregunta: ${prompt}`
+    };
+
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: "gpt-3.5-turbo",
+        messages: [systemMessage, userMessage],
+        max_tokens: 400,
+        temperature: 0.25,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`OpenAI API error: ${response.status} ${errorText}`);
+    }
+
+    const data = await response.json();
+    const answer = data?.choices?.[0]?.message?.content;
+    if (!answer || typeof answer !== "string") {
+      throw new Error("Respuesta inválida de OpenAI.");
+    }
+
+    return answer.trim();
   }
 
   app.post('/api/inventory/chat', async (req, res) => {
@@ -393,14 +459,23 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const { prompt } = z.object({ prompt: z.string().min(1) }).parse(req.body);
       const meds = await storage.getMedications(undefined, undefined, location);
       const families = await storage.getFamilies(location);
-      const answer = answerFromInventory(prompt, meds, families);
+      const answer = await callOpenAIInventoryAssistant(prompt, meds, families);
       res.json({ answer });
     } catch (error: any) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Ingresa una pregunta válida." });
       }
       console.error("Error en chat de inventario:", error);
-      res.status(500).json({ message: "Error interno al procesar el chat." });
+      const fallbackLocation = req.user?.inventoryLocation || "magdaleno";
+      try {
+        const meds = await storage.getMedications(undefined, undefined, fallbackLocation);
+        const families = await storage.getFamilies(fallbackLocation);
+        const fallbackAnswer = answerFromInventory(req.body?.prompt || "", meds, families);
+        return res.json({ answer: fallbackAnswer });
+      } catch (fallbackError) {
+        console.error("Fallback del chat de inventario falló:", fallbackError);
+        return res.status(500).json({ message: "Error interno al procesar el chat." });
+      }
     }
   });
 
