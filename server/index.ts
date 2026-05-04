@@ -12,7 +12,9 @@ import { users } from "@shared/schema";
 import { eq } from "drizzle-orm";
 import { scrypt, randomBytes } from "crypto";
 import { promisify } from "util";
-// ----------------------
+// --- IMPORT PARA POOL ---
+import { pool } from "./db";
+
 
 const app = express();
 const httpServer = createServer(app);

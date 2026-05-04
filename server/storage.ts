@@ -337,14 +337,13 @@ export class DatabaseStorage implements IStorage {
         !l.inventoryLocation || l.inventoryLocation.toLowerCase() === inventoryLocation.toLowerCase()
       ) as LogWithUser[];
     } catch (error: any) {
-      if (error?.code === '42703' && String(error.message).includes('medication_id')) {
+      if (error?.code === '42703' && (String(error.message).includes('medication_id') || String(error.message).includes('inventory_location'))) {
         const rawLogs = await db.select({
           id: logs.id,
           userId: logs.userId,
           action: logs.action,
           medicationName: logs.medicationName,
           details: logs.details,
-          inventoryLocation: logs.inventoryLocation,
           timestamp: logs.timestamp,
         })
         .from(logs)
@@ -360,6 +359,7 @@ export class DatabaseStorage implements IStorage {
         const logsWithUsers = rawLogs.map((log: any) => ({
           ...log,
           medicationId: null,
+          inventoryLocation: 'magdaleno',
           user: log.userId ? userMap.get(log.userId) : null,
         }));
 
