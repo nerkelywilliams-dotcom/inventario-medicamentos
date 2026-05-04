@@ -173,13 +173,14 @@ export function useBulkCreateMedications() {
         credentials: "include",
       });
 
-      const contentType = res.headers.get("content-type");
       if (!res.ok) {
+        const contentType = res.headers.get("content-type");
         if (contentType && contentType.includes("text/html")) {
           throw new Error("Error de ruta (404/500). Verifica que el servidor esté encendido.");
         }
-        const error = await res.json().catch(() => ({ message: "Error en la carga masiva" }));
-        throw new Error(error.message || "Error en la carga masiva");
+        const errorBody = await res.json().catch(() => ({ message: "Error en la carga masiva" }));
+        const message = errorBody.error ? JSON.stringify(errorBody.error) : errorBody.message || "Error en la carga masiva";
+        throw new Error(message);
       }
       
       return await res.json();

@@ -133,23 +133,41 @@ export default function Inventory() {
         const arrayBuffer = evt.target?.result;
         const wb = XLSX.read(arrayBuffer, { type: "array", cellDates: true });
         const wsname = wb.SheetNames[0];
-        const rawData: any[] = XLSX.utils.sheet_to_json(wb.Sheets[wsname], { raw: false });
+        const rawData: any[] = XLSX.utils.sheet_to_json(wb.Sheets[wsname], { raw: false, defval: "" });
 
         const familyMap = new Map(families.map((f: any) => [f.name.toLowerCase().trim(), f.id]));
 
+        const normalizeKey = (key: string) =>
+          String(key || "")
+            .toLowerCase()
+            .normalize("NFD")
+            .replace(/[\u0000-\u001f\u007f-\u009f]/g, "")
+            .replace(/\s+/g, "")
+            .replace(/[^a-z0-9]/gi, "");
+
+        const getCell = (row: any, ...keys: string[]) => {
+          for (const key of keys) {
+            const normalized = normalizeKey(key);
+            const found = Object.keys(row).find((rawKey) => normalizeKey(rawKey) === normalized);
+            if (found && row[found] !== "") return row[found];
+          }
+          return undefined;
+        };
+
         const formattedData = rawData.map((row: any) => {
-          let fId = row.familyId;
-          if (typeof row.familyId === 'string' && isNaN(Number(row.familyId))) {
-            fId = familyMap.get(row.familyId.toLowerCase().trim()) || null;
+          const rawFamily = getCell(row, "familyId", "familia", "id_familia", "familiavisual", "familia visual");
+          let fId = rawFamily;
+          if (typeof rawFamily === "string" && isNaN(Number(rawFamily))) {
+            fId = familyMap.get(String(rawFamily).toLowerCase().trim()) || null;
           }
 
-          // Validación de fecha segura
+          const rawExpiration = getCell(row, "expirationDate", "fechaexpiracion", "fechadevencimiento", "vencimiento", "fecha_vencimiento");
           let dateValue: string;
           try {
-            if (row.expirationDate instanceof Date) {
-              dateValue = row.expirationDate.toISOString();
-            } else if (row.expirationDate) {
-              const parsedDate = new Date(row.expirationDate);
+            if (rawExpiration instanceof Date) {
+              dateValue = rawExpiration.toISOString();
+            } else if (rawExpiration) {
+              const parsedDate = new Date(rawExpiration);
               dateValue = isNaN(parsedDate.getTime()) ? new Date().toISOString() : parsedDate.toISOString();
             } else {
               dateValue = new Date().toISOString();
@@ -158,20 +176,23 @@ export default function Inventory() {
             dateValue = new Date().toISOString();
           }
 
+          const rawQuantity = getCell(row, "quantity", "cantidad", "stock");
+          const rawPediatric = getCell(row, "isPediatric", "pediatric", "pediatrico", "esPediatrico", "es_pediatrico");
+
           return {
-            name: String(row.name || "Sin Nombre").trim(),
-            dose: String(row.dose || "N/A").trim(),
-            presentation: String(row.presentation || "N/A").trim(),
-            quantity: parseInt(row.quantity) || 0,
+            name: String(getCell(row, "name", "nombre", "medicamento") || "Sin Nombre").trim(),
+            dose: String(getCell(row, "dose", "dosis") || "N/A").trim(),
+            presentation: String(getCell(row, "presentation", "presentacion") || "N/A").trim(),
+            quantity: Number(rawQuantity || 0),
             expirationDate: dateValue,
-            isPediatric: String(row.isPediatric).toUpperCase() === "TRUE",
-            familyId: fId ? parseInt(fId) : null,
-            description: String(row.description || "").trim(),
-            actionMechanism: String(row.actionMechanism || row.actionMecha || "").trim(),
-            indications: String(row.indications || "").trim(),
-            posology: String(row.posology || "").trim(),
-            contraindications: String(row.contraindications || row.contraindicat || "").trim(),
-            interactions: String(row.interactions || "").trim()
+            isPediatric: ["true", "sí", "si", "yes", "1"].includes(String(rawPediatric || "").trim().toLowerCase()),
+            familyId: fId ? Number(fId) : null,
+            description: String(getCell(row, "description", "descripcion") || "").trim(),
+            actionMechanism: String(getCell(row, "actionMechanism", "accion", "mecanismodeaccion", "mecanismo") || "").trim(),
+            indications: String(getCell(row, "indications", "indicaciones") || "").trim(),
+            posology: String(getCell(row, "posology", "posologia") || "").trim(),
+            contraindications: String(getCell(row, "contraindications", "contraindicaciones") || "No especificadas").trim(),
+            interactions: String(getCell(row, "interactions", "interacciones") || "No especificadas").trim(),
           };
         });
 

@@ -298,8 +298,13 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       
       res.status(200).json({ message: "Importación exitosa", count: validatedItems.length });
     } catch (error: any) {
-      console.error("Detalle del error Zod:", JSON.stringify(error, null, 2));
-      res.status(400).json({ message: "Error de validación", error: error.issues || error.message });
+      if (error instanceof z.ZodError) {
+        console.error("Error de validación Zod en importación:", error.issues);
+        return res.status(400).json({ message: "Error de validación", error: error.issues });
+      }
+
+      console.error("Error en importación de medicamentos:", error);
+      res.status(500).json({ message: "Error interno en servidor", error: error.message || String(error) });
     }
   });
 
