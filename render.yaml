@@ -10,5 +10,5 @@ services:
       - key: NODE_ENV
         value: production
       - key: DATABASE_URL
-        scope: build
+        scope: runtime
     autoDeploy: true
