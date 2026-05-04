@@ -121,6 +121,45 @@ async function initialize() {
       console.log("  ✅ Tabla 'medication_catalog' ya existe, no es necesaria migración.");
     }
 
+    console.log("🔍 Verificando esquema de tabla logs...");
+    const [existingLogsTable] = await pool.query("SELECT to_regclass('public.logs') as exists");
+    const logsTableExists = existingLogsTable.rows[0] && existingLogsTable.rows[0].exists !== null;
+
+    if (!logsTableExists) {
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS logs (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER REFERENCES users(id),
+          action TEXT NOT NULL,
+          medication_name TEXT NOT NULL,
+          medication_id INTEGER,
+          details TEXT,
+          inventory_location TEXT NOT NULL DEFAULT 'magdaleno',
+          timestamp TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL
+        );
+      `);
+      console.log("  ✅ Tabla 'logs' creada correctamente.");
+    } else {
+      const logColumns = await pool.query(
+        "SELECT column_name FROM information_schema.columns WHERE table_name='logs'"
+      );
+      const existingColumns = new Set(logColumns.rows.map((row: any) => row.column_name));
+
+      if (!existingColumns.has('medication_id')) {
+        await pool.query(`ALTER TABLE logs ADD COLUMN medication_id INTEGER;`);
+        console.log("  ├─ Columna 'medication_id' añadida a 'logs'.");
+      }
+      if (!existingColumns.has('inventory_location')) {
+        await pool.query(`ALTER TABLE logs ADD COLUMN inventory_location TEXT NOT NULL DEFAULT 'magdaleno';`);
+        console.log("  ├─ Columna 'inventory_location' añadida a 'logs'.");
+      }
+      if (!existingColumns.has('timestamp')) {
+        await pool.query(`ALTER TABLE logs ADD COLUMN timestamp TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL;`);
+        console.log("  ├─ Columna 'timestamp' añadida a 'logs'.");
+      }
+      console.log("  ✅ Esquema de logs verificado.");
+    }
+
     console.log("🌱 Inicializando datos de prueba...");
 
     // Verificar familias

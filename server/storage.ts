@@ -293,17 +293,31 @@ export class DatabaseStorage implements IStorage {
 
     const validUserId = insertLog.userId || (adminUser ? adminUser.id : null);
 
-    const [newLog] = await db.insert(logs).values({
+    const logValues: any = {
       action: insertLog.action || "ACTUALIZACIÓN",
       details: insertLog.details || "Cambio en inventario",
       userId: validUserId,
-      medicationId: insertLog.medicationId || null,
       medicationName: insertLog.medicationName || "Medicamento",
-      inventoryLocation: insertLog.inventoryLocation || "magdaleno", 
-      timestamp: new Date()
-    }).returning();
-    
-    return newLog;
+      inventoryLocation: insertLog.inventoryLocation || "magdaleno",
+      timestamp: new Date(),
+    };
+
+    if (insertLog.medicationId !== undefined && insertLog.medicationId !== null) {
+      logValues.medicationId = insertLog.medicationId;
+    }
+
+    try {
+      const [newLog] = await db.insert(logs).values(logValues).returning();
+      return newLog;
+    } catch (error: any) {
+      if (error?.code === '42703' && String(error.message).includes('medication_id')) {
+        const fallbackValues = { ...logValues };
+        delete fallbackValues.medicationId;
+        const [newLog] = await db.insert(logs).values(fallbackValues).returning();
+        return newLog;
+      }
+      throw error;
+    }
   }
 
   async getRecentLogs(inventoryLocation?: string, limit = 50): Promise<LogWithUser[]> {
