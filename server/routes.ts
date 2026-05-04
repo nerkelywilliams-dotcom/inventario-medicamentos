@@ -296,6 +296,20 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     );
   }
 
+  function findMedicationMatchesByIndication(prompt: string, meds: any[]) {
+    const normalizedPrompt = normalizeText(prompt);
+    return meds.filter((med: any) => {
+      const indicationsText = normalizeText(
+        [med.catalog?.indications, med.catalog?.name, med.catalog?.description, med.catalog?.mechanismOfAction]
+          .filter(Boolean)
+          .join(" ")
+      );
+
+      const promptTokens = normalizedPrompt.split(/\s+/).filter((token: string) => token.length > 3);
+      return promptTokens.some((token: string) => indicationsText.includes(token)) || indicationsText.includes(normalizedPrompt);
+    });
+  }
+
   function answerFromInventory(prompt: string, meds: any[], families: any[]) {
     const normalizedPrompt = normalizeText(prompt);
 
@@ -307,6 +321,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     const phrases = {
       diabetes: /diabet|hiperglucemia|insulina/.test(normalizedPrompt),
       antibiotics: /antibiot|antibio/.test(normalizedPrompt),
+      fever: /fiebr|febr|antit[ií]rmico|paracetamol|ibuprofeno/.test(normalizedPrompt),
       cough: /tos|toser|toses|resfriado|gripe/.test(normalizedPrompt),
       pediatric: /niñ|nino|ninio|infantil|pediatrico/.test(normalizedPrompt),
       expiration: /venc|caduc|expir|estado/.test(normalizedPrompt),
@@ -338,6 +353,24 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       return `Hay ${matches.length} medicamentos registrados como antibióticos con un total de ${totalUnits} unidades disponibles.`;
     }
 
+    if (phrases.fever) {
+      const matches = meds.filter((med: any) => {
+        const text = searchTextForMedication(med);
+        return /fiebr|febr|antit[ií]rmico|paracetamol|ibuprofeno|dipirona|metamizol/.test(text);
+      });
+      if (matches.length === 0) {
+        return "No se encontraron medicamentos directamente relacionados con fiebre en este inventario.";
+      }
+      const filtered = phrases.pediatric
+        ? matches.filter((med: any) => med.isPediatric)
+        : matches;
+      if (filtered.length === 0) {
+        return "Hay medicamentos para fiebre, pero no se encontró ninguno marcado como pediátrico.";
+      }
+      const names = Array.from(new Set(filtered.map((med: any) => med.catalog?.name))).slice(0, 8);
+      return `Para fiebre ${phrases.pediatric ? "en niños" : ""} hay ${filtered.length} registros. Algunos son: ${names.join(", ")}.`;
+    }
+
     if (phrases.cough) {
       const matches = meds.filter((med: any) => searchTextForMedication(med).includes("tos") || searchTextForMedication(med).includes("antigripal") || searchTextForMedication(med).includes("refri"));
       if (matches.length === 0) {
@@ -351,6 +384,12 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       }
       const names = Array.from(new Set(filtered.map((med: any) => med.catalog?.name))).slice(0, 8);
       return `Para la tos ${phrases.pediatric ? "en niños" : ""} hay ${filtered.length} registros. Algunos son: ${names.join(", ")}.`;
+    }
+
+    const indicationMatches = findMedicationMatchesByIndication(prompt, meds);
+    if (indicationMatches.length > 0) {
+      const names = Array.from(new Set(indicationMatches.map((med: any) => med.catalog?.name))).slice(0, 8);
+      return `Encontré ${indicationMatches.length} medicamentos con indicaciones relacionadas a tu consulta. Algunos son: ${names.join(", ")}.`;
     }
 
     if (phrases.expiration || /vencidos/.test(normalizedPrompt)) {
