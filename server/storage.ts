@@ -269,8 +269,6 @@ export class DatabaseStorage implements IStorage {
             "contraindications",
             "interactions",
             "imageUrl",
-            "dose",
-            "presentation",
           ]) {
             const value = (normalizedValues as any)[key];
             if (value !== undefined && value !== null && String(value).trim() !== "") {
@@ -284,16 +282,43 @@ export class DatabaseStorage implements IStorage {
           }
         }
 
-        await tx.insert(medications).values({
-          catalogId: catalogEntry.id,
-          familyId: item.familyId || null,
-          dose: item.dose || catalogEntry.dose,
-          presentation: item.presentation || catalogEntry.presentation,
-          quantity: item.quantity || 0,
-          expirationDate: item.expirationDate,
-          isPediatric: item.isPediatric || false,
-          inventoryLocation: inventoryLocation,
+        const existingMedication = await tx.query.medications.findFirst({
+          where: {
+            catalogId: catalogEntry.id,
+            presentation: item.presentation || catalogEntry.presentation,
+            dose: item.dose || catalogEntry.dose,
+            familyId: item.familyId || null,
+            inventoryLocation,
+          },
         });
+
+        if (existingMedication) {
+          const updatedQuantity = (existingMedication.quantity || 0) + (item.quantity || 0);
+          const existingExpiration = existingMedication.expirationDate ? new Date(existingMedication.expirationDate) : null;
+          const incomingExpiration = item.expirationDate ? new Date(item.expirationDate) : null;
+          let expirationDate = existingExpiration || incomingExpiration;
+          if (existingExpiration && incomingExpiration) {
+            expirationDate = existingExpiration < incomingExpiration ? existingExpiration : incomingExpiration;
+          }
+
+          await tx.update(medications).set({
+            quantity: updatedQuantity,
+            expirationDate: expirationDate || existingMedication.expirationDate,
+            isPediatric: item.isPediatric !== undefined ? item.isPediatric : existingMedication.isPediatric,
+            familyId: item.familyId || existingMedication.familyId,
+          }).where(eq(medications.id, existingMedication.id));
+        } else {
+          await tx.insert(medications).values({
+            catalogId: catalogEntry.id,
+            familyId: item.familyId || null,
+            dose: item.dose || catalogEntry.dose,
+            presentation: item.presentation || catalogEntry.presentation,
+            quantity: item.quantity || 0,
+            expirationDate: item.expirationDate,
+            isPediatric: item.isPediatric || false,
+            inventoryLocation: inventoryLocation,
+          });
+        }
       }
     });
   }
