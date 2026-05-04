@@ -196,6 +196,19 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
+  app.delete('/api/medications/all', async (req, res) => {
+    try {
+      const isAdmin = req.user?.role === "admin" || req.user?.username === "admin_magdaleno";
+      if (!isAdmin) return res.status(403).json({ message: "No autorizado para vaciar inventario" });
+      
+      const location = req.user?.inventoryLocation || "magdaleno";
+      await storage.deleteAllMedications(location);
+      res.json({ message: "Inventario vaciado por completo" });
+    } catch (error: any) {
+      res.status(500).json({ message: "Error al vaciar", error: error.message });
+    }
+  });
+
   app.delete('/api/medications/:id', async (req, res) => {
     try {
       const id = parseInt(req.params.id);
@@ -312,19 +325,6 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
       console.error("Error en importación de medicamentos:", error);
       res.status(500).json({ message: "Error interno en servidor", error: error.message || String(error) });
-    }
-  });
-
-  app.delete('/api/medications/all', async (req, res) => {
-    try {
-      const isAdmin = req.user?.role === "admin" || req.user?.username === "admin_magdaleno";
-      if (!isAdmin) return res.status(403).json({ message: "No autorizado para vaciar inventario" });
-      
-      const location = req.user?.inventoryLocation || "magdaleno";
-      await storage.deleteAllMedications(location);
-      res.json({ message: "Inventario vaciado por completo" });
-    } catch (error: any) {
-      res.status(500).json({ message: "Error al vaciar", error: error.message });
     }
   });
 
