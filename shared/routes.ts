@@ -200,6 +200,18 @@ export const api = {
         }),
       },
     },
+    chat: {
+      method: 'POST' as const,
+      path: '/api/inventory/chat',
+      input: z.object({
+        prompt: z.string().min(1),
+      }),
+      responses: {
+        200: z.object({ answer: z.string() }),
+        400: errorSchemas.validation,
+        500: errorSchemas.internal,
+      },
+    },
   },
 };
 

@@ -14,7 +14,8 @@ import {
   Baby,
   LogOut,
   ClipboardList,
-  UserCircle
+  UserCircle,
+  MessageSquare,
 } from "lucide-react";
 
 // Importación de componentes del Sidebar
@@ -42,6 +43,7 @@ import LandingPage from "@/pages/LandingPage";
 import Login from "@/pages/Login";
 import SettingsPage from "@/pages/Settings";
 import LogsPage from "@/pages/logs-page";
+import InventoryChat from "@/pages/InventoryChat";
 import Terms from "@/pages/Terms";
 import Privacy from "@/pages/Privacy";
 
@@ -128,6 +130,14 @@ function Router() {
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild isActive={location === "/inventory-chat"} tooltip="Chat IA de Inventario">
+                    <Link href="/inventory-chat">
+                      <MessageSquare className="size-4" />
+                      <span>Chat IA</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
               </SidebarMenu>
             </SidebarGroup>
 
@@ -203,6 +213,7 @@ function Router() {
               {/* Rutas protegidas explícitas */}
               <Route path="/" component={Dashboard} />
               <Route path="/inventory" component={Inventory} />
+              <Route path="/inventory-chat" component={InventoryChat} />
               <Route path="/settings" component={SettingsPage} />
               
               <Route path="/bitacora">

@@ -270,6 +270,140 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   });
 
   // --- DASHBOARD & ESTADÍSTICAS ---
+  function normalizeText(value: any): string {
+    return String(value || "")
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9\s]/g, "")
+      .trim();
+  }
+
+  function searchTextForMedication(med: any): string {
+    return normalizeText(
+      [
+        med.catalog?.name,
+        med.catalog?.description,
+        med.catalog?.indications,
+        med.catalog?.mechanismOfAction,
+        med.catalog?.administrationRoute,
+        med.family?.name,
+        med.presentation,
+        med.quantity,
+      ]
+        .filter(Boolean)
+        .join(" ")
+    );
+  }
+
+  function answerFromInventory(prompt: string, meds: any[], families: any[]) {
+    const normalizedPrompt = normalizeText(prompt);
+
+    if (meds.length === 0) {
+      return "No hay medicamentos registrados en esta sede actualmente.";
+    }
+
+    const allText = meds.map(searchTextForMedication).join(" ");
+    const phrases = {
+      diabetes: /diabet|hiperglucemia|insulina/.test(normalizedPrompt),
+      antibiotics: /antibiot|antibio/.test(normalizedPrompt),
+      cough: /tos|toser|toses|resfriado|gripe/.test(normalizedPrompt),
+      pediatric: /niñ|nino|ninio|infantil|pediatrico/.test(normalizedPrompt),
+      expiration: /venc|caduc|expir|estado/.test(normalizedPrompt),
+      lowStock: /bajo stock|poco stock|escaso|faltan|agotar/.test(normalizedPrompt),
+      total: /cuant|cantidad|total|cuánto/.test(normalizedPrompt),
+    };
+
+    const familyMatch = families.find((family: any) => normalizeText(family.name).split(" ").some((word: string) => normalizedPrompt.includes(word)));
+    let matchedMeds = meds;
+    if (familyMatch) {
+      matchedMeds = meds.filter((med: any) => med.family?.id === familyMatch.id || normalizeText(med.family?.name).includes(normalizeText(familyMatch.name)));
+    }
+
+    if (phrases.diabetes) {
+      const matches = meds.filter((med: any) => searchTextForMedication(med).includes("diabet"));
+      if (matches.length === 0) {
+        return "No se encontraron medicamentos con indicación directa para diabetes en este inventario.";
+      }
+      const names = Array.from(new Set(matches.map((med: any) => med.catalog?.name))).slice(0, 8);
+      return `Tenemos ${matches.length} registros asociados a diabetes. Algunos medicamentos son: ${names.join(", ")}.`;
+    }
+
+    if (phrases.antibiotics) {
+      const matches = meds.filter((med: any) => normalizeText(med.family?.name).includes("antibiot") || searchTextForMedication(med).includes("antibiot"));
+      if (matches.length === 0) {
+        return "No se encontraron antibióticos en el inventario de esta sede.";
+      }
+      const totalUnits = matches.reduce((acc: number, med: any) => acc + (med.quantity || 0), 0);
+      return `Hay ${matches.length} medicamentos registrados como antibióticos con un total de ${totalUnits} unidades disponibles.`;
+    }
+
+    if (phrases.cough) {
+      const matches = meds.filter((med: any) => searchTextForMedication(med).includes("tos") || searchTextForMedication(med).includes("antigripal") || searchTextForMedication(med).includes("refri"));
+      if (matches.length === 0) {
+        return "No se encontraron medicamentos específicamente relacionados con la tos en este inventario.";
+      }
+      const filtered = phrases.pediatric
+        ? matches.filter((med: any) => med.isPediatric)
+        : matches;
+      if (filtered.length === 0) {
+        return "Hay medicamentos para la tos, pero no se encontró ninguno marcado como pediátrico.";
+      }
+      const names = Array.from(new Set(filtered.map((med: any) => med.catalog?.name))).slice(0, 8);
+      return `Para la tos ${phrases.pediatric ? "en niños" : ""} hay ${filtered.length} registros. Algunos son: ${names.join(", ")}.`;
+    }
+
+    if (phrases.expiration || /vencidos/.test(normalizedPrompt)) {
+      const now = new Date();
+      const expired = meds.filter((med: any) => med.expirationDate && new Date(med.expirationDate) < now);
+      if (expired.length === 0) {
+        return "No hay medicamentos vencidos en el inventario de esta sede.";
+      }
+      const names = Array.from(new Set(expired.map((med: any) => med.catalog?.name))).slice(0, 8);
+      return `Hay ${expired.length} medicamentos vencidos o próximos a vencer. Ejemplos: ${names.join(", ")}.`;
+    }
+
+    if (phrases.lowStock) {
+      const low = meds.filter((med: any) => (med.quantity || 0) < 10);
+      if (low.length === 0) {
+        return "No hay medicamentos con stock bajo por debajo de 10 unidades.";
+      }
+      const names = Array.from(new Set(low.map((med: any) => med.catalog?.name))).slice(0, 8);
+      return `Hay ${low.length} medicamentos con stock bajo. Algunos ejemplos son: ${names.join(", ")}.`;
+    }
+
+    if (phrases.total) {
+      const totalUnits = meds.reduce((acc, med) => acc + (med.quantity || 0), 0);
+      return `En total hay ${meds.length} medicamentos registrados y ${totalUnits} unidades en stock.`;
+    }
+
+    if (familyMatch) {
+      const totalUnits = matchedMeds.reduce((acc: number, med: any) => acc + (med.quantity || 0), 0);
+      const names = Array.from(new Set(matchedMeds.map((med: any) => med.catalog?.name))).slice(0, 8);
+      return `La familia ${familyMatch.name} tiene ${matchedMeds.length} medicamentos registrados con ${totalUnits} unidades totales. Ejemplos: ${names.join(", ")}.`;
+    }
+
+    const fallbackNames = Array.from(new Set(meds.slice(0, 8).map((med: any) => med.catalog?.name))).join(", ");
+    return `Puedo responder consultas sobre familias, stock, vencimientos y usos. En esta sede hay ${meds.length} medicamentos registrados. Algunos ejemplos son: ${fallbackNames}.`; 
+  }
+
+  app.post('/api/inventory/chat', async (req, res) => {
+    try {
+      const location = req.user?.inventoryLocation || "magdaleno";
+      const { prompt } = z.object({ prompt: z.string().min(1) }).parse(req.body);
+      const meds = await storage.getMedications(undefined, undefined, location);
+      const families = await storage.getFamilies(location);
+      const answer = answerFromInventory(prompt, meds, families);
+      res.json({ answer });
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Ingresa una pregunta válida." });
+      }
+      console.error("Error en chat de inventario:", error);
+      res.status(500).json({ message: "Error interno al procesar el chat." });
+    }
+  });
+
   app.get('/api/inventory/stats', async (req, res) => {
     try {
       const location = req.user?.inventoryLocation || "magdaleno";
