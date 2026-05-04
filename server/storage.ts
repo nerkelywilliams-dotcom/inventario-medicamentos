@@ -227,7 +227,20 @@ export class DatabaseStorage implements IStorage {
     // Usamos una transacción para asegurar integridad en importaciones masivas
     await db.transaction(async (tx) => {
       for (const item of items) {
-        // Buscamos o creamos en el catálogo dentro de la transacción
+        const normalizedValues = {
+          name: item.name,
+          description: item.description || null,
+          mechanismOfAction: item.mechanismOfAction || null,
+          indications: item.indications || null,
+          posology: item.posology || null,
+          administrationRoute: item.administrationRoute || null,
+          contraindications: item.contraindications || "No especificadas",
+          interactions: item.interactions || "No especificadas",
+          imageUrl: item.imageUrl || null,
+          dose: item.dose || "N/A",
+          presentation: item.presentation || "N/A",
+        };
+
         let [catalogEntry] = await tx
           .select()
           .from(medicationCatalog)
@@ -235,12 +248,40 @@ export class DatabaseStorage implements IStorage {
 
         if (!catalogEntry) {
           [catalogEntry] = await tx.insert(medicationCatalog).values({
-            name: item.name,
-            dose: item.dose || "N/A",
-            presentation: item.presentation || "N/A",
-            contraindications: "No especificadas",
-            interactions: "No especificadas"
+            name: normalizedValues.name,
+            description: normalizedValues.description,
+            mechanismOfAction: normalizedValues.mechanismOfAction,
+            indications: normalizedValues.indications,
+            posology: normalizedValues.posology,
+            administrationRoute: normalizedValues.administrationRoute,
+            contraindications: normalizedValues.contraindications,
+            interactions: normalizedValues.interactions,
+            imageUrl: normalizedValues.imageUrl,
           }).returning();
+        } else {
+          const catalogUpdates: Record<string, any> = {};
+          for (const key of [
+            "description",
+            "mechanismOfAction",
+            "indications",
+            "posology",
+            "administrationRoute",
+            "contraindications",
+            "interactions",
+            "imageUrl",
+            "dose",
+            "presentation",
+          ]) {
+            const value = (normalizedValues as any)[key];
+            if (value !== undefined && value !== null && String(value).trim() !== "") {
+              catalogUpdates[key] = value;
+            }
+          }
+
+          if (Object.keys(catalogUpdates).length > 0) {
+            await tx.update(medicationCatalog).set(catalogUpdates).where(eq(medicationCatalog.id, catalogEntry.id));
+            catalogEntry = { ...catalogEntry, ...catalogUpdates };
+          }
         }
 
         await tx.insert(medications).values({
@@ -250,7 +291,8 @@ export class DatabaseStorage implements IStorage {
           presentation: item.presentation || catalogEntry.presentation,
           quantity: item.quantity || 0,
           expirationDate: item.expirationDate,
-          inventoryLocation: inventoryLocation
+          isPediatric: item.isPediatric || false,
+          inventoryLocation: inventoryLocation,
         });
       }
     });
