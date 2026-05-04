@@ -136,6 +136,7 @@ export default function Inventory() {
         const rawData: any[] = XLSX.utils.sheet_to_json(wb.Sheets[wsname], { raw: false, defval: "" });
 
         const familyMap = new Map(families.map((f: any) => [f.name.toLowerCase().trim(), f.id]));
+        const validFamilyIds = new Set(families.map((f: any) => Number(f.id)));
 
         const normalizeKey = (key: string) =>
           String(key || "")
@@ -156,9 +157,17 @@ export default function Inventory() {
 
         const formattedData = rawData.map((row: any) => {
           const rawFamily = getCell(row, "familyId", "familia", "id_familia", "familiavisual", "familia visual");
-          let fId = rawFamily;
-          if (typeof rawFamily === "string" && isNaN(Number(rawFamily))) {
-            fId = familyMap.get(String(rawFamily).toLowerCase().trim()) || null;
+          let familyId: number | null = null;
+
+          if (rawFamily !== undefined && rawFamily !== null && rawFamily !== "") {
+            if (typeof rawFamily === "number") {
+              familyId = validFamilyIds.has(rawFamily) ? rawFamily : null;
+            } else if (!isNaN(Number(rawFamily))) {
+              const parsed = Number(rawFamily);
+              familyId = validFamilyIds.has(parsed) ? parsed : null;
+            } else {
+              familyId = familyMap.get(String(rawFamily).toLowerCase().trim()) || null;
+            }
           }
 
           const rawExpiration = getCell(row, "expirationDate", "fechaexpiracion", "fechadevencimiento", "vencimiento", "fecha_vencimiento");
@@ -186,7 +195,7 @@ export default function Inventory() {
             quantity: Number(rawQuantity || 0),
             expirationDate: dateValue,
             isPediatric: ["true", "sí", "si", "yes", "1"].includes(String(rawPediatric || "").trim().toLowerCase()),
-            familyId: fId ? Number(fId) : null,
+            familyId,
             description: String(getCell(row, "description", "descripcion") || "").trim(),
             actionMechanism: String(getCell(row, "actionMechanism", "accion", "mecanismodeaccion", "mecanismo") || "").trim(),
             indications: String(getCell(row, "indications", "indicaciones") || "").trim(),

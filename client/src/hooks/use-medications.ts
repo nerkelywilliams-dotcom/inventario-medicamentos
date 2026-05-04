@@ -211,9 +211,7 @@ export function useClearInventory() {
 
   return useMutation({
     mutationFn: async () => {
-      const headers: HeadersInit = {
-        "Content-Type": "application/json",
-      };
+      const headers: HeadersInit = {};
       
       if (user) {
         headers["x-user"] = encodeUserHeader(user);

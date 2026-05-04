@@ -283,14 +283,20 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       
       if (!Array.isArray(items)) return res.status(400).json({ message: "Formato inválido" });
       
+      const families = await storage.getFamilies(location);
+      const validFamilyIds = new Set(families.map((f: any) => Number(f.id)));
+      
       const sanitizedItems = items.map(item => {
+        const familyIdCandidate = item.familyId !== undefined && item.familyId !== null ? Number(item.familyId) : null;
+        const familyId = familyIdCandidate && validFamilyIds.has(familyIdCandidate) ? familyIdCandidate : null;
+
         return {
           ...item,
           name: item.name && item.name.trim() !== "" ? item.name : "Medicamento sin nombre",
           dose: item.dose && item.dose.trim() !== "" ? item.dose : "N/A",
           presentation: item.presentation && item.presentation.trim() !== "" ? item.presentation : "N/A",
           quantity: item.quantity ? parseInt(item.quantity) : 0,
-          familyId: item.familyId ? Number(item.familyId) : null 
+          familyId,
         };
       });
 
