@@ -36,7 +36,7 @@ export function ImportarCSV() {
             quantity: parseInt(row.quantity || row.Cantidad) || 0,
             expirationDate: row.expirationDate || row["Fecha de Vencimiento"] || row.Vencimiento || null,
             dose: row.dose || row.Dosis || "Ver empaque",
-            description: row.description || row.Descripción || "",
+            description: row.description || row.Descripción || row["Descripción General"] || row["Descripcion General"] || "",
             mechanismOfAction: row.mechanismOfAction || row["Mecanismo de Acción"] || "",
             indications: row.indications || row.Indicaciones || "",
             posology: row.posology || row.Posología || "",

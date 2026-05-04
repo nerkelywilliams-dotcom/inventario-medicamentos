@@ -144,6 +144,7 @@ export default function Inventory() {
             .toLowerCase()
             .normalize("NFD")
             .replace(/[\u0000-\u001f\u007f-\u009f]/g, "")
+            .replace(/[\u0300-\u036f]/g, "")
             .replace(/\s+/g, "")
             .replace(/[^a-z0-9]/gi, "");
 
@@ -197,7 +198,7 @@ export default function Inventory() {
             expirationDate: dateValue,
             isPediatric: ["true", "sí", "si", "yes", "1"].includes(String(rawPediatric || "").trim().toLowerCase()),
             familyId,
-            description: String(getCell(row, "description", "descripcion") || "").trim(),
+            description: String(getCell(row, "description", "descripcion", "descripción", "descripciongeneral", "descripcióngeneral", "descripcion general", "descripción general") || "").trim(),
             administrationRoute: String(getCell(row, "administrationRoute", "via", "vía", "route", "ruta", "administracion") || "").trim(),
             actionMechanism: String(getCell(row, "actionMechanism", "accion", "mecanismodeaccion", "mecanismo") || "").trim(),
             indications: String(getCell(row, "indications", "indicaciones") || "").trim(),
