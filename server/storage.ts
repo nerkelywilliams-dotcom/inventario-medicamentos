@@ -6,7 +6,7 @@ import {
   type User, type InsertUser,
   type Log, type InsertLog, type LogWithUser, type MedicationWithCatalogAndFamily, type InsertMedicationFull
 } from "@shared/schema";
-import { eq, ilike, and, desc } from "drizzle-orm";
+import { eq, ilike, and, desc, inArray } from "drizzle-orm";
 
 // Tipo compuesto para inventario con catálogo
 export type MedicationWithFamily = MedicationWithCatalogAndFamily;
@@ -321,20 +321,56 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getRecentLogs(inventoryLocation?: string, limit = 50): Promise<LogWithUser[]> {
-    const allLogs = await db.query.logs.findMany({
-      orderBy: [desc(logs.timestamp)],
-      with: { 
-        user: true 
-      },
-      limit: limit
-    });
+    try {
+      const allLogs = await db.query.logs.findMany({
+        orderBy: [desc(logs.timestamp)],
+        with: {
+          user: true
+        },
+        limit: limit
+      });
 
-    if (!inventoryLocation) return allLogs as LogWithUser[];
+      if (!inventoryLocation) return allLogs as LogWithUser[];
 
-    // Filtro para la ubicación específica
-    return allLogs.filter(l => 
-      !l.inventoryLocation || l.inventoryLocation.toLowerCase() === inventoryLocation.toLowerCase()
-    ) as LogWithUser[];
+      // Filtro para la ubicación específica
+      return allLogs.filter(l => 
+        !l.inventoryLocation || l.inventoryLocation.toLowerCase() === inventoryLocation.toLowerCase()
+      ) as LogWithUser[];
+    } catch (error: any) {
+      if (error?.code === '42703' && String(error.message).includes('medication_id')) {
+        const rawLogs = await db.select({
+          id: logs.id,
+          userId: logs.userId,
+          action: logs.action,
+          medicationName: logs.medicationName,
+          details: logs.details,
+          inventoryLocation: logs.inventoryLocation,
+          timestamp: logs.timestamp,
+        })
+        .from(logs)
+        .orderBy(desc(logs.timestamp))
+        .limit(limit);
+
+        const userIds = Array.from(new Set(rawLogs.map((l: any) => l.userId).filter(Boolean)));
+        const usersList = userIds.length
+          ? await db.select().from(users).where(inArray(users.id, userIds))
+          : [];
+        const userMap = new Map(usersList.map((u: any) => [u.id, u]));
+
+        const logsWithUsers = rawLogs.map((log: any) => ({
+          ...log,
+          medicationId: null,
+          user: log.userId ? userMap.get(log.userId) : null,
+        }));
+
+        if (!inventoryLocation) return logsWithUsers as LogWithUser[];
+
+        return logsWithUsers.filter((l: any) => 
+          !l.inventoryLocation || l.inventoryLocation.toLowerCase() === inventoryLocation.toLowerCase()
+        ) as LogWithUser[];
+      }
+      throw error;
+    }
   }
 }
 
