@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Button } from "./ui/button";
 import { Trash2, AlertTriangle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/context/AuthContext";
 import { queryClient } from "@/lib/queryClient";
 import {
   AlertDialog,
@@ -17,17 +18,23 @@ import {
 
 export function BorrarInventario() {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [loading, setLoading] = useState(false);
 
   const handleClearAll = async () => {
     setLoading(true);
     try {
+      const headers: HeadersInit = { "Content-Type": "application/json" };
+      if (user) headers["x-user"] = btoa(JSON.stringify(user));
+
       const response = await fetch('/api/medications/all', {
         method: 'DELETE',
+        headers,
+        credentials: 'include',
       });
 
       if (!response.ok) {
-        const error = await response.json();
+        const error = await response.json().catch(() => ({ message: 'Error al vaciar el inventario' }));
         throw new Error(error.message || "Error al vaciar el inventario");
       }
 

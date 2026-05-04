@@ -166,8 +166,8 @@ export function useBulkCreateMedications() {
         };
       });
 
-      const res = await fetch("/api/medications/import", { 
-        method: "POST",
+      const res = await fetch(api.medications.import.path, { 
+        method: api.medications.import.method,
         headers,
         body: JSON.stringify(payload),
         credentials: "include",
@@ -178,7 +178,7 @@ export function useBulkCreateMedications() {
         if (contentType && contentType.includes("text/html")) {
           throw new Error("Error de ruta (404/500). Verifica que el servidor esté encendido.");
         }
-        const error = await res.json();
+        const error = await res.json().catch(() => ({ message: "Error en la carga masiva" }));
         throw new Error(error.message || "Error en la carga masiva");
       }
       
@@ -218,8 +218,8 @@ export function useClearInventory() {
         headers["x-user"] = encodeUserHeader(user);
       }
 
-      const res = await fetch("/api/medications/all", {
-        method: "DELETE",
+      const res = await fetch(api.medications.deleteAll.path, {
+        method: api.medications.deleteAll.method,
         headers,
         credentials: "include",
       });
@@ -229,7 +229,7 @@ export function useClearInventory() {
         if (contentType && contentType.includes("text/html")) {
           throw new Error("No se pudo limpiar el inventario: Error de ruta (404/500).");
         }
-        const error = await res.json();
+        const error = await res.json().catch(() => ({ message: "No se pudo limpiar el inventario" }));
         throw new Error(error.message || "No se pudo limpiar el inventario");
       }
     },

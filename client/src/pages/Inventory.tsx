@@ -130,10 +130,10 @@ export default function Inventory() {
     const reader = new FileReader();
     reader.onload = async (evt) => {
       try {
-        const bstr = evt.target?.result;
-        const wb = XLSX.read(bstr, { type: "binary", cellDates: true });
+        const arrayBuffer = evt.target?.result;
+        const wb = XLSX.read(arrayBuffer, { type: "array", cellDates: true });
         const wsname = wb.SheetNames[0];
-        const rawData: any[] = XLSX.utils.sheet_to_json(wb.Sheets[wsname]);
+        const rawData: any[] = XLSX.utils.sheet_to_json(wb.Sheets[wsname], { raw: false });
 
         const familyMap = new Map(families.map((f: any) => [f.name.toLowerCase().trim(), f.id]));
 
@@ -188,7 +188,7 @@ export default function Inventory() {
         if (fileInputRef.current) fileInputRef.current.value = "";
       }
     };
-    reader.readAsBinaryString(file);
+    reader.readAsArrayBuffer(file);
   };
 
   const handleDelete = async (id: number) => {
