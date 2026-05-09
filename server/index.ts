@@ -166,7 +166,7 @@ async function ensureLogsSchema() {
     console.log('✅ Base de datos inicializada');
 
     console.log('🔄 Registrando rutas...');
-    await registerRoutes(httpServer, app);
+    registerRoutes(app);
     console.log('✅ Rutas registradas');
 
     app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
