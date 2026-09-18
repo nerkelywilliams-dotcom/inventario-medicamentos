@@ -1,108 +1,153 @@
-import { useState } from "react";
-import { Button } from "./ui/button";
-import { Upload } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
-import { useBulkCreateMedications } from "@/hooks/use-medications"; // ✅ Importamos el nuevo hook
+"use client";
+
+import { useState, useRef } from "react";
 import * as XLSX from "xlsx";
+import { useBulkCreateMedications } from "@/hooks/use-medications";
+import { useCreateLog } from "@/hooks/use-logs";
+import { useAuth } from "@/context/AuthContext";
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
+import { Loader2, FileSpreadsheet } from "lucide-react";
 
 export function ImportarCSV() {
+  const [isProcessing, setIsProcessing] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const bulkCreateMutation = useBulkCreateMedications();
+  const createLog = useCreateLog();
+  const { user } = useAuth();
   const { toast } = useToast();
-  const [uploading, setUploading] = useState(false);
-  const { mutateAsync: bulkCreate } = useBulkCreateMedications(); // ✅ Usamos la mutación
 
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
+  const handleButtonClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
     if (!file) return;
 
-    setUploading(true);
-    toast({ title: "Procesando", description: "Leyendo archivo..." });
+    setIsProcessing(true);
 
-    try {
-      const reader = new FileReader();
-      reader.onload = async (e) => {
-        try {
-          const data = new Uint8Array(e.target?.result as ArrayBuffer);
-          const workbook = XLSX.read(data, { type: "array" });
-          const firstSheetName = workbook.SheetNames[0];
-          const worksheet = workbook.Sheets[firstSheetName];
-          
-          // Convertir el Excel/CSV a un arreglo de objetos JSON
-          const jsonData = XLSX.utils.sheet_to_json(worksheet);
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      try {
+        const bstr = evt.target?.result;
+        const wb = XLSX.read(bstr, { type: "binary", cellDates: true });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        
+        const rawData: any[] = XLSX.utils.sheet_to_json(ws);
 
-          // Mapear y limpiar los datos para asegurar que coincidan con tu schema de Zod
-          const formattedData = jsonData.map((row: any) => ({
-            name: row.name ? String(row.name).trim() : (row.Nombre || ""),
-            presentation: row.presentation ? String(row.presentation).trim() : (row.Presentación || ""),
-            quantity: parseInt(row.quantity || row.Cantidad) || 0,
-            expirationDate: row.expirationDate || row["Fecha de Vencimiento"] || row.Vencimiento || null,
-            dose: row.dose || row.Dosis || "Ver empaque",
-            description: row.description || row.Descripción || row["Descripción General"] || row["Descripcion General"] || "",
-            mechanismOfAction: row.mechanismOfAction || row["Mecanismo de Acción"] || "",
-            indications: row.indications || row.Indicaciones || "",
-            posology: row.posology || row.Posología || "",
-            administrationRoute: row.administrationRoute || row["Vía de Administración"] || "",
-            contraindications: row.contraindications || row.Contraindicaciones || "No especificadas",
-            interactions: row.interactions || row.Interacciones || "No especificadas",
-            isPediatric: row.isPediatric || row.Pediátrico || false,
-            familyId: row.familyId ? parseInt(row.familyId) : undefined,
-          })).filter(item => item.name && item.presentation); // Ignorar filas vacías
+        if (!rawData || rawData.length === 0) {
+          toast({
+            variant: "destructive",
+            title: "Archivo vacío",
+            description: "No se encontraron datos en el archivo seleccionado.",
+          });
+          setIsProcessing(false);
+          return;
+        }
 
-          if (formattedData.length === 0) {
-            throw new Error("El archivo está vacío o las columnas no coinciden con 'name' y 'presentation'.");
+        const formattedData = rawData.map((row) => {
+          const isPediatricRaw = row["isPediatric"] ?? row["Es Pediátrico"] ?? row["Pediátrico"];
+          const isPediatric = 
+            isPediatricRaw === true || 
+            String(isPediatricRaw).toUpperCase() === "TRUE" || 
+            String(isPediatricRaw).toUpperCase() === "VERDADERO" ||
+            String(isPediatricRaw) === "1";
+
+          let expDate = row["expirationDate"] ?? row["expiration Date"] ?? row["Fecha Vencimiento"] ?? row["Vencimiento"];
+          if (expDate instanceof Date) {
+            expDate = expDate.toISOString();
           }
 
-          toast({ title: "Importando", description: `Enviando ${formattedData.length} medicamentos...` });
-          
-          // ✅ ENVIAR DATOS USANDO EL HOOK (Maneja auth y caché automáticamente)
-          await bulkCreate(formattedData);
+          return {
+            name: String(row["name"] ?? row["Nombre"] ?? row["Medicamento"] ?? "").trim(),
+            dose: String(row["dose"] ?? row["Dosis"] ?? "Ver empaque").trim(),
+            presentation: String(row["presentation"] ?? row["Presentación"] ?? "No especificada").trim(),
+            quantity: Number(row["quantity"] ?? row["Cantidad"] ?? row["Stock"] ?? 0),
+            expirationDate: expDate,
+            isPediatric: isPediatric,
+            familyId: row["familyId"] ?? row["Familia ID"] ? Number(row["familyId"] ?? row["Familia ID"]) : null,
+            description: row["description"] ?? row["Descripción"] ?? null,
+            mechanismOfAction: row["actionMechanism"] ?? row["mechanismOfAction"] ?? row["Mecanismo de Acción"] ?? null,
+            indications: row["indications"] ?? row["Indicaciones"] ?? null,
+            posology: row["posology"] ?? row["Posología"] ?? null,
+            administrationRoute: row["administrationRoute"] ?? row["Vía de Administración"] ?? row["Vía"] ?? null,
+            contraindications: row["contraindications"] ?? row["Contraindicaciones"] ?? "No especificadas",
+            interactions: row["interactions"] ?? row["Interacciones"] ?? "No especificadas",
+          };
+        }).filter(item => item.name.length > 0);
 
-          toast({ 
-            title: "¡Éxito!", 
-            description: `${formattedData.length} medicamentos importados correctamente.` 
+        if (formattedData.length === 0) {
+          toast({
+            variant: "destructive",
+            title: "Formato no reconocido",
+            description: "Asegúrate de incluir la columna 'name' o 'Nombre'.",
           });
-          
-        } catch (error: any) {
-          console.error("Error detallado:", error);
-          toast({ 
-            variant: "destructive", 
-            title: "Error en la importación", 
-            description: error.message || "Hubo un problema al procesar los datos." 
-          });
-        } finally {
-          setUploading(false);
-          event.target.value = ''; // Resetear el input
+          setIsProcessing(false);
+          return;
         }
-      };
-      
-      reader.readAsArrayBuffer(file);
-    } catch (error: any) {
-      toast({ 
-        variant: "destructive", 
-        title: "Error", 
-        description: "No se pudo leer el archivo." 
-      });
-      setUploading(false);
-      event.target.value = '';
-    }
+
+        await bulkCreateMutation.mutateAsync(formattedData);
+
+        if (user) {
+          await createLog.mutateAsync({
+            action: "CREAR",
+            details: `Carga masiva por Excel: ${formattedData.length} medicamentos cargados.`,
+            userId: user.id,
+          });
+        }
+
+        toast({
+          title: "Carga Masiva Completada",
+          description: `Se procesaron e ingresaron ${formattedData.length} medicamentos con éxito.`,
+        });
+
+      } catch (error: any) {
+        console.error("Error al importar Excel:", error);
+        toast({
+          variant: "destructive",
+          title: "Error al importar",
+          description: error?.message || "Ocurrió un error al procesar la estructura del Excel.",
+        });
+      } finally {
+        setIsProcessing(false);
+        if (fileInputRef.current) {
+          fileInputRef.current.value = "";
+        }
+      }
+    };
+
+    reader.readAsBinaryString(file);
   };
 
   return (
-    <div className="flex gap-2">
+    <>
       <input
         type="file"
-        id="csvInput"
+        ref={fileInputRef}
+        onChange={handleFileChange}
+        accept=".xlsx, .xls, .csv"
         className="hidden"
-        accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel"
-        onChange={handleFileUpload}
       />
-      <Button 
-        variant="outline" 
-        onClick={() => document.getElementById('csvInput')?.click()} 
-        disabled={uploading}
-        className="border-dashed"
+      <Button
+        variant="outline"
+        onClick={handleButtonClick}
+        disabled={isProcessing || bulkCreateMutation.isPending}
+        className="gap-2 border-emerald-600 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-500 dark:text-emerald-400 dark:hover:bg-emerald-950/50 font-medium shadow-sm"
       >
-        <Upload className="mr-2 h-4 w-4" /> {uploading ? "Importando..." : "Importar Datos"}
+        {isProcessing || bulkCreateMutation.isPending ? (
+          <>
+            <Loader2 className="h-4 w-4 animate-spin text-emerald-600" />
+            Cargando Excel...
+          </>
+        ) : (
+          <>
+            <FileSpreadsheet className="h-4 w-4 text-emerald-600" />
+            Cargar desde Excel
+          </>
+        )}
       </Button>
-    </div>
+    </>
   );
 }
