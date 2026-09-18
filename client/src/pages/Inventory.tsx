@@ -1,4 +1,4 @@
-"use client"
+"use client";
 
 import { useState, useRef } from "react";
 import * as XLSX from "xlsx";
@@ -210,6 +210,11 @@ export default function Inventory() {
 
         await bulkCreateMutation.mutateAsync(formattedData);
         if (user) await createLog.mutateAsync({ action: "CREAR", details: `Importación masiva: ${formattedData.length} ítems.`, userId: user.id });
+        
+        toast({
+          title: "Importación Exitosa",
+          description: `Se cargaron ${formattedData.length} registros correctamente.`,
+        });
       } catch (error: any) {
         console.error("Error detallado:", error);
         toast({ 
@@ -265,19 +270,20 @@ export default function Inventory() {
             <FileDown className="h-4 w-4" /> Exportar/Plantilla
           </Button>
 
+          {/* Botón de Importar Excel visible siempre */}
+          <input type="file" ref={fileInputRef} onChange={handleFileChange} accept=".xlsx,.xls,.csv" className="hidden" />
+          <Button 
+            variant="outline" 
+            onClick={handleImportClick} 
+            className="gap-2 border-emerald-600 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-500 dark:text-emerald-400 shadow-sm"
+            disabled={bulkCreateMutation.isPending}
+          >
+            {bulkCreateMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin text-emerald-600" /> : <Upload className="h-4 w-4 text-emerald-600" />}
+            Cargar desde Excel
+          </Button>
+
           {isAdmin && (
             <>
-              <input type="file" ref={fileInputRef} onChange={handleFileChange} accept=".xlsx,.xls,.csv" className="hidden" />
-              <Button 
-                variant="outline" 
-                onClick={handleImportClick} 
-                className="gap-2 border-green-600 text-green-700 hover:bg-green-50 shadow-sm"
-                disabled={bulkCreateMutation.isPending}
-              >
-                {bulkCreateMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-                Importar Excel
-              </Button>
-
               <AlertDialog open={isClearDialogOpen} onOpenChange={setIsClearDialogOpen}>
                 <AlertDialogTrigger asChild>
                   <Button variant="destructive" className="gap-2 font-bold"><Trash2 className="h-4 w-4" /> Vaciar Inventario</Button>
